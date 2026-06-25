@@ -6,11 +6,11 @@
 <title>YELLOW BOX</title>
 <meta property="og:title" content="Yellow Box">
 <meta property="og:description" content="Make your own Deutsche Grammophon cover">
-<meta property="og:image" content="https://deusaderit.com/og-image.jpg">
+<meta property="og:image" content="https://deusaderit.com/shareimage.jpg">
 <meta property="og:url" content="https://deusaderit.com">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://deusaderit.com/og-image.jpg">
+<meta name="twitter:image" content="https://deusaderit.com/shareimage.jpg">
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA4ElEQVR4nO3bQQ6CMBQGYZ/xHN7/XF6kbA2IZcUnvn+WhZDJ0BIWbY0xxq0xdy2gSQAtoEkALaBJAC2gSQAtoHmsB6pKeJzK+89vZsDehfE6U+Mc6rkdywyY3fCp2tX4NpunAWYP+HVmL7D9EkgALaBJAC2gSQAtoEkALaBJAC2gSQAtoEkALaBJAC2gSQAtoEkALaBJAC2gSQAtoEkALaBJAC2gSQAtoEkALaBpH+DQFpl/2Ce0xzTAlfcHHaH9Eqj1oalslW3G5hvQ7RRd+xmQAFpAkwBaQJMAWkDTPsAC1tQZgs+IhdcAAAAASUVORK5CYII=">
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -604,6 +604,7 @@ async function shareImg() {
     form.append('image', base64);
     const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, { method: 'POST', body: form });
     const data = await res.json();
+    if (!data.success) throw new Error(data.error?.message || 'ImgBB error');
     const url = data.data.url;
 
     // Share or copy URL
@@ -611,10 +612,10 @@ async function shareImg() {
       await navigator.share({ url, title: 'Yellow Box' });
     } else {
       await navigator.clipboard.writeText(url);
-      alert('Link copied!');
+      alert('Link copied!\n\n' + url);
     }
   } catch(e) {
-    alert('Upload failed. Check your ImgBB API key.');
+    alert('Share failed: ' + e.message);
   } finally {
     btn.textContent = 'SHARE';
     btn.disabled = false;
