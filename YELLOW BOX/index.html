@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>YELLOW BOX</title>
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA4ElEQVR4nO3bQQ6CMBQGYZ/xHN7/XF6kbA2IZcUnvn+WhZDJ0BIWbY0xxq0xdy2gSQAtoEkALaBJAC2gSQAtoHmsB6pKeJzK+89vZsDehfE6U+Mc6rkdywyY3fCp2tX4NpunAWYP+HVmL7D9EkgALaBJAC2gSQAtoEkALaBJAC2gSQAtoEkALaBJAC2gSQAtoEkALaBJAC2gSQAtoEkALaBJAC2gSQAtoEkALaBpH+DQFpl/2Ce0xzTAlfcHHaH9Eqj1oalslW3G5hvQ7RRd+xmQAFpAkwBaQJMAWkDTPsAC1tQZgs+IhdcAAAAASUVORK5CYII=">
 <style>
@@ -18,6 +18,8 @@ body {
   justify-content: center;
   gap: 20px;
   padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /* ── Square canvas ── */
@@ -458,6 +460,15 @@ document.getElementById('size-slider').addEventListener('input', function() {
   updateTransform();
 });
 
+// ── Mouse wheel zoom (desktop) ──
+canvasEl.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.95 : 1.05;
+  scale = Math.min(3, Math.max(0.25, scale * delta));
+  updateTransform();
+  document.getElementById('size-slider').value = scale * 100;
+}, { passive: false });
+
 // ── Clear ──
 function clearAll() {
   bgImg.src = '';
@@ -481,19 +492,20 @@ function downloadImg() {
   const ctx = c.getContext('2d');
   ctx.scale(PX, PX);
 
-  // Black background
-  ctx.fillStyle = '#000';
+  // White background
+  ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // Background photo (object-fit:contain + translate + scale)
+  // Background photo (object-fit:contain + pan + zoom)
   if (bgImg.src && bgImg.style.display !== 'none') {
     const iw = bgImg.naturalWidth, ih = bgImg.naturalHeight;
-    const r = Math.min(SIZE / iw, SIZE / ih);
-    const fw = iw * r, fh = ih * r;
+    const baseScale = Math.min(SIZE / iw, SIZE / ih);
+    const fw = iw * baseScale, fh = ih * baseScale;
+    const ox = (SIZE - fw) / 2, oy = (SIZE - fh) / 2;
     ctx.save();
     ctx.translate(SIZE / 2 + posX, SIZE / 2 + posY);
     ctx.scale(scale, scale);
-    ctx.drawImage(bgImg, -fw / 2, -fh / 2, fw, fh);
+    ctx.drawImage(bgImg, -(SIZE / 2 - ox) , -(SIZE / 2 - oy), fw, fh);
     ctx.restore();
   }
 
@@ -543,73 +555,16 @@ function buildCanvas() {
 }
 
 
-// Show share button only on devices that support file sharing
-(async () => {
-  try {
-    const testFile = new File([''], 'test.png', { type: 'image/png' });
-    if (navigator.canShare && navigator.canShare({ files: [testFile] })) {
-      document.getElementById('share-btn').style.display = '';
-    }
-  } catch(e) {}
-})();
+document.getElementById('share-btn').style.display = '';
 
 async function shareImg() {
-  // Build the same canvas as download
-  const SIZE = canvasEl.offsetWidth;
-  const PX = 2;
-  const c = document.createElement('canvas');
-  c.width = SIZE * PX; c.height = SIZE * PX;
-  const ctx = c.getContext('2d');
-
-  // Draw background
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, c.width, c.height);
-  if (bgImg.src && bgImg.style.display !== 'none') {
-    const nat = bgImg.naturalWidth / bgImg.naturalHeight;
-    let dw, dh, dx, dy;
-    if (nat > 1) { dw = SIZE * PX; dh = dw / nat; } else { dh = SIZE * PX; dw = dh * nat; }
-    dx = (SIZE * PX - dw) / 2 + posX * PX;
-    dy = (SIZE * PX - dh) / 2 + posY * PX;
-    ctx.save(); ctx.scale(scale, scale);
-    ctx.drawImage(bgImg, dx / scale, dy / scale, dw / scale, dh / scale);
-    ctx.restore();
+  const url = 'https://deusaderit.com';
+  if (navigator.share) {
+    try { await navigator.share({ url }); } catch(e) {}
+  } else {
+    await navigator.clipboard.writeText(url);
+    alert('Link copied!');
   }
-
-  // Draw DG overlay
-  const dgImg = document.getElementById('dg-overlay');
-  ctx.drawImage(dgImg, 0, 0, SIZE * PX, SIZE * PX);
-
-  // Draw text — reuse same logic
-  const boxH = SIZE * 0.34;
-  [['tl1',true],['tl2',false],['tl3',false],['tl4',false],['tl-tab',true]].forEach(([id, upper]) => {
-    const el = document.getElementById(id);
-    let txt = el.textContent.trim();
-    if (!txt) return;
-    if (upper) txt = txt.toUpperCase();
-    const cs = getComputedStyle(el);
-    const fs = parseFloat(cs.fontSize) * PX;
-    ctx.font = `${cs.fontWeight} ${fs}px ${cs.fontFamily}`;
-    ctx.fillStyle = '#000';
-    ctx.textAlign = 'center';
-    const rect = el.getBoundingClientRect();
-    const cRect = canvasEl.getBoundingClientRect();
-    const cx = (rect.left + rect.width / 2 - cRect.left) * PX;
-    const cy = (rect.top + rect.height / 2 - cRect.top) * PX + fs * 0.35;
-    ctx.fillText(txt, cx, cy);
-  });
-
-  c.toBlob(async blob => {
-    const file = new File([blob], 'yellow-box.png', { type: 'image/png' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: 'Yellow Box' }); } catch(e) {}
-    } else {
-      // Fallback: download
-      const a = document.createElement('a');
-      a.download = 'yellow-box.png';
-      a.href = URL.createObjectURL(blob);
-      a.click();
-    }
-  }, 'image/png');
 }
 
 // ── Enter key navigation in text lines ──
