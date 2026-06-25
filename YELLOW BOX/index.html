@@ -543,27 +543,72 @@ function downloadImg() {
   }
 }
 
-// ── Share ──
-function buildCanvas() {
-  const SIZE = canvasEl.offsetWidth;
-  const PX = 2;
-  const c = document.createElement('canvas');
-  c.width = SIZE * PX; c.height = SIZE * PX;
-  const ctx = c.getContext('2d');
-  // (reuse same drawing logic as downloadImg but return canvas)
-  return c;
-}
-
+// ── Share (upload to ImgBB → get URL) ──
+const IMGBB_KEY = '8c2cc9e9139cc9c3e4df12efe407d821'; // ← replace with your ImgBB API key
 
 document.getElementById('share-btn').style.display = '';
 
 async function shareImg() {
-  const url = 'https://deusaderit.com';
-  if (navigator.share) {
-    try { await navigator.share({ url }); } catch(e) {}
-  } else {
-    await navigator.clipboard.writeText(url);
-    alert('Link copied!');
+  const btn = document.getElementById('share-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  try {
+    // Render canvas same as download
+    const SIZE = canvasEl.offsetWidth;
+    const PX = 2;
+    const c = document.createElement('canvas');
+    c.width = SIZE * PX; c.height = SIZE * PX;
+    const ctx = c.getContext('2d');
+    ctx.scale(PX, PX);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    if (bgImg.src && bgImg.style.display !== 'none') {
+      const iw = bgImg.naturalWidth, ih = bgImg.naturalHeight;
+      const baseScale = Math.min(SIZE / iw, SIZE / ih);
+      const fw = iw * baseScale, fh = ih * baseScale;
+      const ox = (SIZE - fw) / 2, oy = (SIZE - fh) / 2;
+      ctx.save();
+      ctx.translate(SIZE / 2 + posX, SIZE / 2 + posY);
+      ctx.scale(scale, scale);
+      ctx.drawImage(bgImg, -(SIZE / 2 - ox), -(SIZE / 2 - oy), fw, fh);
+      ctx.restore();
+    }
+    ctx.drawImage(document.getElementById('dg-overlay'), 0, 0, SIZE, SIZE);
+    const canvasRect = canvasEl.getBoundingClientRect();
+    [['tl1',true],['tl2',false],['tl3',false],['tl4',false],['tl-tab',true]].forEach(([id,upper]) => {
+      const el = document.getElementById(id);
+      const text = upper ? el.textContent.toUpperCase() : el.textContent;
+      if (!text.trim()) return;
+      const s = window.getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      ctx.save();
+      ctx.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+      ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, r.left - canvasRect.left + r.width / 2, r.top - canvasRect.top + r.height / 2);
+      ctx.restore();
+    });
+
+    // Upload to ImgBB
+    const base64 = c.toDataURL('image/jpeg', 0.9).split(',')[1];
+    const form = new FormData();
+    form.append('image', base64);
+    const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, { method: 'POST', body: form });
+    const data = await res.json();
+    const url = data.data.url;
+
+    // Share or copy URL
+    if (navigator.share) {
+      await navigator.share({ url, title: 'Yellow Box' });
+    } else {
+      await navigator.clipboard.writeText(url);
+      alert('Link copied!');
+    }
+  } catch(e) {
+    alert('Upload failed. Check your ImgBB API key.');
+  } finally {
+    btn.textContent = 'SHARE';
+    btn.disabled = false;
   }
 }
 
