@@ -33,7 +33,7 @@ body {
 #canvas {
   width: min(600px, 90vw);
   height: min(600px, 90vw);
-  background: #fff;
+  background: #000;
   border: 1px solid #000;
   position: relative;
   overflow: hidden;
@@ -64,7 +64,7 @@ body {
   align-items: center;
   justify-content: center;
   padding-top: 60px;
-  color: #000;
+  color: #FFE200;
   font: bold 12px/1 'Perpetua', 'Perpetua Titling MT', 'Book Antiqua', Palatino, serif;
   letter-spacing: 0;
   cursor: pointer;
@@ -72,6 +72,8 @@ body {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
+
+#canvas.has-image { border: none; }
 
 /* Drag-over state */
 #canvas.drag-over { border-color: #FFE200; }
