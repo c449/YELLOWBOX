@@ -21,13 +21,13 @@ body {
   justify-content: center;
   gap: 20px;
   padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
-  overflow: hidden;
+  overflow: clip;
   overscroll-behavior: none;
 }
 
 /* ── Square canvas ── */
 #canvas {
-  --sz: min(600px, 90vw, calc(100dvh - 120px));
+  --sz: min(600px, 90vw, calc(100svh - 160px));
   width: var(--sz);
   height: var(--sz);
   background: #000;
