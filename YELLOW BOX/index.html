@@ -27,8 +27,9 @@ body {
 
 /* ── Square canvas ── */
 #canvas {
-  width: min(600px, 90vw);
-  height: min(600px, 90vw);
+  --sz: min(600px, 90vw, calc(100dvh - 120px));
+  width: var(--sz);
+  height: var(--sz);
   background: #000;
   border: 1px solid #000;
   position: relative;
