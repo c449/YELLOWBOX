@@ -552,20 +552,33 @@ function downloadImg() {
     ctx.restore();
   });
 
+  const dataUrl = c.toDataURL('image/png');
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   if (isIOS) {
-    // iOS Safari: open image in new tab — tap & hold to save to Photos
-    window.open(c.toDataURL('image/png'), '_blank');
+    // iOS blocks programmatic downloads — show image overlay, user long-presses to save
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+    const hint = document.createElement('p');
+    hint.textContent = 'Press & hold image to save';
+    hint.style.cssText = 'color:#FFE200;font:bold 13px Perpetua,serif;letter-spacing:1px;margin:0;';
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.cssText = 'max-width:88vw;max-height:72vh;';
+    const btn = document.createElement('button');
+    btn.textContent = 'CLOSE';
+    btn.style.cssText = 'color:#fff;background:none;border:1px solid #fff;padding:8px 20px;font:bold 12px Perpetua,serif;letter-spacing:1px;cursor:pointer;';
+    btn.onclick = function(){ document.body.removeChild(overlay); };
+    overlay.appendChild(hint);
+    overlay.appendChild(img);
+    overlay.appendChild(btn);
+    document.body.appendChild(overlay);
   } else {
-    c.toBlob(function(blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.download = 'yellow-box.png';
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
-    }, 'image/png');
+    const a = document.createElement('a');
+    a.download = 'yellow-box.png';
+    a.href = dataUrl;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 }
 
