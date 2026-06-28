@@ -561,7 +561,7 @@ function downloadImg() {
     const img = document.createElement('img');
     img.src = dataUrl;
     const csz = canvasEl.offsetWidth + 'px';
-    img.style.cssText = 'width:' + csz + ';height:' + csz + ';max-width:95vw;max-height:95vw;display:block;';
+    img.style.cssText = 'width:' + csz + ';height:auto;max-width:95vw;display:block;';
     const hint = document.createElement('p');
     hint.textContent = 'PRESS & HOLD TO SAVE';
     hint.style.cssText = 'color:#fff;font:bold 12px Perpetua,serif;letter-spacing:2px;margin:12px 0 0;';
