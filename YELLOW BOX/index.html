@@ -560,17 +560,14 @@ function downloadImg() {
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
     const img = document.createElement('img');
     img.src = dataUrl;
-    img.style.cssText = 'max-width:88vw;max-height:65vh;display:block;';
+    const csz = canvasEl.offsetWidth + 'px';
+    img.style.cssText = 'width:' + csz + ';height:' + csz + ';max-width:95vw;max-height:95vw;display:block;';
     const hint = document.createElement('p');
     hint.textContent = 'PRESS & HOLD TO SAVE';
     hint.style.cssText = 'color:#fff;font:bold 12px Perpetua,serif;letter-spacing:2px;margin:12px 0 0;';
-    const btn = document.createElement('button');
-    btn.textContent = 'CLOSE';
-    btn.style.cssText = 'color:#fff;background:none;border:1px solid #fff;padding:8px 20px;font:bold 12px Perpetua,serif;letter-spacing:1px;cursor:pointer;margin-top:12px;';
-    btn.onclick = function(){ document.body.removeChild(overlay); };
+    overlay.onclick = function(){ document.body.removeChild(overlay); };
     overlay.appendChild(img);
     overlay.appendChild(hint);
-    overlay.appendChild(btn);
     document.body.appendChild(overlay);
   } else {
     const a = document.createElement('a');
