@@ -17,7 +17,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 20px;
   padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   overflow: clip;
@@ -29,6 +29,7 @@ body {
   --sz: min(600px, 90vw, calc(100svh - 160px));
   width: var(--sz);
   height: var(--sz);
+  margin-top: auto;
   background: #000;
   border: 1px solid #000;
   position: relative;
@@ -205,6 +206,7 @@ body {
   flex-wrap: wrap;
   justify-content: center;
   margin-top: 16px;
+  margin-bottom: auto;
 }
 
 .btn {
@@ -557,14 +559,14 @@ function downloadImg() {
   if (isIOS) {
     // iOS blocks programmatic downloads — show image overlay, user long-presses to save
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
     const img = document.createElement('img');
     img.src = dataUrl;
     const csz = canvasEl.offsetWidth + 'px';
     img.style.cssText = 'width:' + csz + ';height:auto;max-width:95vw;display:block;';
     const hint = document.createElement('p');
     hint.textContent = 'PRESS & HOLD TO SAVE';
-    hint.style.cssText = 'color:#fff;font:bold 12px Perpetua,serif;letter-spacing:2px;margin:12px 0 0;';
+    hint.style.cssText = 'color:#000;font:bold 12px Perpetua,serif;letter-spacing:2px;margin:12px 0 0;';
     overlay.onclick = function(){ document.body.removeChild(overlay); };
     overlay.appendChild(img);
     overlay.appendChild(hint);
