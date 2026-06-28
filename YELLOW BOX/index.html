@@ -552,16 +552,20 @@ function downloadImg() {
     ctx.restore();
   });
 
-  const url = c.toDataURL();
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   if (isIOS) {
-    // iOS Safari doesn't support programmatic download — open in new tab, user saves with long-press
-    window.open(url, '_blank');
+    // iOS Safari: open image in new tab — tap & hold to save to Photos
+    window.open(c.toDataURL('image/png'), '_blank');
   } else {
-    const a = document.createElement('a');
-    a.download = 'yellow-box.png';
-    a.href = url;
-    a.click();
+    c.toBlob(function(blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = 'yellow-box.png';
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    }, 'image/png');
   }
 }
 
