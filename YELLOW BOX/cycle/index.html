@@ -13,11 +13,6 @@
   --moss:#ffffff; --azure:#ffffff; --violet:#ffffff;
   --line:#000000;
 }
-@font-face{
-  font-family:'GOTHICC';
-  src:url('GOTHICC.ttf') format('truetype'),url('GOTHICC.otf') format('opentype'),local('GOTHICC');
-  font-display:swap;
-}
 *{margin:0;padding:0;box-sizing:border-box}
 body{
   background:var(--ink);
@@ -742,6 +737,11 @@ document.getElementById("btn-reset").onclick=()=>{
   }
 };
 boot();
+// Load GOTHICC from the /gothicc page's embedded font (always the current version)
+fetch('/gothicc/').then(r=>r.text()).then(t=>{
+  const m=t.match(/url\((data:font\/[^)]+)\)/);
+  if(m){const f=new FontFace('GOTHICC','url('+m[1]+')');f.load().then(ff=>document.fonts.add(ff)).catch(()=>{});}
+}).catch(()=>{});
 </script>
 </body>
 </html>
