@@ -526,7 +526,7 @@ function drawWheel(){
     <text x="${c}" y="${c+16}" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="52" fill="#000000">${Math.min(day,99)}</text>
     <text x="${c}" y="${c+44}" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="17" fill="#000000">of ${L} · ${phNow.name.toLowerCase()}</text>
   </svg>`;
-  document.getElementById("wheelcaption").textContent =
+  document.getElementById("wheelcaption").innerHTML =
     day<=L ? `${moonSVG(mp.frac)} The ${phNow.name.toLowerCase()} phase, under the ${mp.name.toLowerCase()}` : `${moonSVG(mp.frac)} Awaiting the new cycle, under the ${mp.name.toLowerCase()}`;
 }
 
