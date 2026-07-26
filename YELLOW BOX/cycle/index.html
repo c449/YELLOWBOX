@@ -48,7 +48,9 @@ h1{font-family:'GOTHICC','cecilia',"Helvetica Neue",Helvetica,Arial,sans-serif;f
 
 /* ---------- layout ---------- */
 .grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:22px;margin-top:26px}
-.gridtop{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px;margin-top:26px;align-items:start}
+.gridtop{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:22px;margin-top:26px;align-items:start}
+.moonplate a{display:block;width:100%;text-align:center}
+#mythimg{width:100%;max-width:170px;height:auto;display:block;margin:0 auto}
 @media(max-width:900px){.gridtop{grid-template-columns:1fr}}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:22px}
 @media(max-width:840px){.grid2,.grid3{grid-template-columns:1fr}}
@@ -251,6 +253,15 @@ footer a{color:var(--gold);text-decoration:none}
         <div class="cardname" id="cardname"></div>
         <div class="cardnum" id="cardnum"></div>
         <div class="cardmeaning" id="cardmeaning"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="paneltitle">MYTH</div>
+      <div class="moonplate">
+        <a id="mythlink" href="#" target="_blank" rel="noopener"><img id="mythimg" alt="" referrerpolicy="no-referrer"></a>
+        <div class="mooncap" id="mythcap"></div>
+        <div class="mooncredit" id="mythcredit"></div>
       </div>
     </section>
 
@@ -481,6 +492,20 @@ function moonPhase(d){
   const i=Math.floor(((age+synodic/16)/synodic)*8)%8;
   return {age,name:names[i],frac:age/synodic};
 }
+const MYTH={
+ menstrual:{img:"https://images.metmuseum.org/CRDImages/gr/web-large/DP271787.jpg",
+   t:"Marble hekataion — triple-bodied Hekate",d:"Roman, 1st–2nd century CE",
+   u:"https://www.metmuseum.org/art/collection/search/255881"},
+ follicular:{img:"https://images.metmuseum.org/CRDImages/gr/web-large/DP20840.jpg",
+   t:"Bronze statuette of Artemis",d:"Greek, 3rd–1st century BCE",
+   u:"https://www.metmuseum.org/art/collection/search/255695"},
+ ovulatory:{img:"https://images.metmuseum.org/CRDImages/gr/web-large/DP138723.jpg",
+   t:"Marble statue of Aphrodite",d:"Roman, 1st–2nd century CE",
+   u:"https://www.metmuseum.org/art/collection/search/254697"},
+ luteal:{img:"https://images.metmuseum.org/CRDImages/gr/web-large/DP116943.jpg",
+   t:"Bell-krater — Demeter and Persephone",d:"Greek, Attic, ca. 440 BCE",
+   u:"https://www.metmuseum.org/art/collection/search/252973"}
+};
 const MOON_BASE="https://svs.gsfc.nasa.gov/vis/a000000/a005000/a005048/";
 const MOON_PHOTOS={
  "New Moon":"phase_new.1933_print.jpg",
@@ -619,6 +644,12 @@ function renderCard(){
   mimg.src=MOON_BASE+(MOON_PHOTOS[mp.name]||MOON_PHOTOS["Full Moon"]);
   mimg.alt=mp.name+" — NASA Lunar Reconnaissance Orbiter";
   document.getElementById("mooncap").textContent=mp.name;
+  const my=MYTH[phaseOf(Math.min(cycleDay(),cycleLen()),cycleLen())];
+  const mi=document.getElementById("mythimg");
+  mi.src=my.img; mi.alt=my.t;
+  document.getElementById("mythlink").href=my.u;
+  document.getElementById("mythcap").textContent=my.t;
+  document.getElementById("mythcredit").textContent=my.d+" · THE MET";
 }
 function renderStats(){
   const L=cycleLen(), ls=lastStart();
