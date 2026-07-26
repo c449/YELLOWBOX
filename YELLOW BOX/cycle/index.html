@@ -191,7 +191,7 @@ footer a{color:var(--gold);text-decoration:none}
 <header>
   <h1>CYCLE</h1>
   
-  <div class="datebar"><span id="todaydate"></span><span class="moonglyph" id="moonglyph"></span><span id="moonname"></span></div>
+  <div class="datebar"><span id="todaydate"></span></div>
 </header>
 
 <!-- ======================= SETUP ======================= -->
@@ -615,8 +615,6 @@ function drawChart(){
 function renderHeader(){
   const mp=moonPhase(new Date());
   document.getElementById("todaydate").textContent=fmtLong(new Date());
-  document.getElementById("moonglyph").innerHTML="&nbsp;·&nbsp;";
-  document.getElementById("moonname").textContent=mp.name;
 }
 function renderPhase(){
   const L=cycleLen(), day=Math.min(cycleDay(),L), ph=PHASES[phaseOf(day,L)];
