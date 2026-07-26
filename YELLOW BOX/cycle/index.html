@@ -100,6 +100,10 @@ h1{font-family:'GOTHICC',"Helvetica Neue",Helvetica,Arial,sans-serif;font-weight
 .cardnum{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:.3em;color:var(--gold-dim);text-align:center;margin-top:-8px}
 .cardmeaning{max-width:300px;text-align:center;font-style:normal;color:var(--parchment-dim);font-size:17px}
 .tapnote{display:none}
+.moonplate{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:20px}
+.moonplate img{width:104px;height:104px;object-fit:contain;display:block}
+.mooncap{font-size:12px;letter-spacing:.24em;text-transform:uppercase}
+.mooncredit{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#000;opacity:.45}
 
 /* ---------- phase panel ---------- */
 .phasehead{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
@@ -243,6 +247,11 @@ footer a{color:var(--gold);text-decoration:none}
         <div class="cardname" id="cardname"></div>
         <div class="cardnum" id="cardnum"></div>
         <div class="cardmeaning" id="cardmeaning"></div>
+        <div class="moonplate">
+          <img id="moonphoto" alt="" referrerpolicy="no-referrer">
+          <div class="mooncap" id="mooncap"></div>
+          <div class="mooncredit">NASA / LRO</div>
+        </div>
       </div>
     </section>
   </div>
@@ -467,6 +476,17 @@ function moonPhase(d){
   const i=Math.floor(((age+synodic/16)/synodic)*8)%8;
   return {age,name:names[i],frac:age/synodic};
 }
+const MOON_BASE="https://svs.gsfc.nasa.gov/vis/a000000/a005000/a005048/";
+const MOON_PHOTOS={
+ "New Moon":"phase_new.1933_print.jpg",
+ "Waxing Crescent":"phase_waxing_crescent.2028_print.jpg",
+ "First Quarter":"phase_first_quarter.2091_print.jpg",
+ "Waxing Gibbous":"phase_waxing_gibbous.2158_print.jpg",
+ "Full Moon":"phase_full.1571_print.jpg",
+ "Waning Gibbous":"phase_waning_gibbous.2403_print.jpg",
+ "Last Quarter":"phase_third_quarter.1755_print.jpg",
+ "Waning Crescent":"phase_waning_crescent.1810_print.jpg"
+};
 function moonSVG(frac){
   // frac 0=new .5=full
   const r=8,c=10; const ill=(1-Math.cos(frac*2*Math.PI))/2;
@@ -527,7 +547,7 @@ function drawWheel(){
     <text x="${c}" y="${c+44}" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="17" fill="#000000">of ${L} · ${phNow.name.toLowerCase()}</text>
   </svg>`;
   document.getElementById("wheelcaption").innerHTML =
-    day<=L ? `${moonSVG(mp.frac)} The ${phNow.name.toLowerCase()} phase, under the ${mp.name.toLowerCase()}` : `${moonSVG(mp.frac)} Awaiting the new cycle, under the ${mp.name.toLowerCase()}`;
+    day<=L ? `The ${phNow.name.toLowerCase()} phase, under the ${mp.name.toLowerCase()}` : `Awaiting the new cycle, under the ${mp.name.toLowerCase()}`;
 }
 
 /* ============================== hormone chart ============================== */
@@ -567,7 +587,7 @@ function drawChart(){
 function renderHeader(){
   const mp=moonPhase(new Date());
   document.getElementById("todaydate").textContent=fmtLong(new Date());
-  document.getElementById("moonglyph").innerHTML=moonSVG(mp.frac);
+  document.getElementById("moonglyph").innerHTML="&nbsp;·&nbsp;";
   document.getElementById("moonname").textContent=mp.name;
 }
 function renderPhase(){
@@ -589,6 +609,11 @@ function renderCard(){
   document.getElementById("cardmeaning").textContent=card.m;
   const frame=document.getElementById("tarotframe");
   frame.classList.add("flipped");
+  const mp=moonPhase(new Date());
+  const mimg=document.getElementById("moonphoto");
+  mimg.src=MOON_BASE+(MOON_PHOTOS[mp.name]||MOON_PHOTOS["Full Moon"]);
+  mimg.alt=mp.name+" — NASA Lunar Reconnaissance Orbiter";
+  document.getElementById("mooncap").textContent=mp.name;
 }
 function renderStats(){
   const L=cycleLen(), ls=lastStart();
