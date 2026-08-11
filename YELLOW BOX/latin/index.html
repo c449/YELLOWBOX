@@ -41,27 +41,35 @@ body {
 
 #output-view { display: none; }
 
-#src {
+#srcwrap {
   height: min(78dvh, 138vw);
   aspect-ratio: 2 / 3;
   background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#src {
+  width: 100%;
+  height: auto;
+  background: none;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
   color: #000;
   font-family: inherit;
-  font-size: clamp(11px, 1.7vw, 13px);
+  font-size: clamp(15px, 2.3vw, 17px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
   line-height: 1.3;
   text-align: center;
   padding: 0 6%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  outline: none;
-  overflow-wrap: anywhere;
 }
 
-#src:empty::before { content: attr(data-ph); }
+#src::placeholder { color: #000; opacity: 1; }
 
 #count {
   font-size: clamp(11px, 1.7vw, 13px);
@@ -88,6 +96,7 @@ body {
 .btn:disabled { color: #000; cursor: default; }
 
 #poster {
+  position: relative;
   height: min(78dvh, 138vw);
   aspect-ratio: 2 / 3;
   background: #fff;
@@ -98,7 +107,26 @@ body {
   overflow: hidden;
 }
 
+#bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+#imgfile {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 #latin {
+  position: relative;
+  z-index: 1;
   font-family: 'cecilia', Georgia, serif;
   font-weight: 400;
   width: 100%;
@@ -116,7 +144,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: clamp(11px, 1.7vw, 13px);
+  font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
   cursor: pointer;
@@ -151,7 +180,6 @@ body {
   color: #fff;
   border-radius: 0;
   padding: 7px 14px;
-  font-size: 11px;
   font-weight: 700;
 }
 
@@ -162,17 +190,22 @@ body {
 <body>
 
 <div id="input-view">
-  <div id="src" contenteditable="plaintext-only" data-ph="Type here"></div>
+  <div id="srcwrap">
+    <textarea id="src" maxlength="140" rows="1" placeholder="Type here"></textarea>
+  </div>
   <div class="row">
     <div id="count">0 / 140</div>
     <label class="check"><input type="checkbox" id="special" onchange="fit()"> Special characters</label>
-    <button class="btn" id="go" onclick="translateIt()" disabled>Make Latin Poster</button>
   </div>
+  <button class="btn" id="go" onclick="translateIt()" disabled>Make Latin Poster</button>
 </div>
 
 <div id="output-view">
-  <div id="poster"><div id="latin"></div></div>
+  <div id="poster"><img id="bg" alt=""><div id="latin"></div></div>
   <div class="row">
+    <button class="btn" onclick="reset()" aria-label="New poster">&#8592;</button>
+    <button class="btn" onclick="document.getElementById('imgfile').click()">Add image</button>
+    <input type="file" id="imgfile" accept="image/*" onchange="loadImg(event)">
     <button class="btn" onclick="downloadPng()" aria-label="Download PNG">&#8595;</button>
   </div>
 </div>
@@ -182,38 +215,26 @@ const src = document.getElementById('src');
 const count = document.getElementById('count');
 const go = document.getElementById('go');
 
+function autosize() {
+  src.style.height = 'auto';
+  src.style.height = src.scrollHeight + 'px';
+}
+
 src.addEventListener('input', () => {
-  let t = src.textContent;
-  if (t.length > 140) {
-    src.textContent = t.slice(0, 140);
-    const r = document.createRange();
-    r.selectNodeContents(src);
-    r.collapse(false);
-    const s = getSelection();
-    s.removeAllRanges();
-    s.addRange(r);
-    t = src.textContent;
-  }
-  if (!t.trim()) src.innerHTML = '';
+  autosize();
+  const t = src.value;
   count.textContent = t.length + ' / 140';
   go.disabled = t.trim().length === 0;
 });
 
-src.addEventListener('paste', e => {
-  e.preventDefault();
-  const t = (e.clipboardData || window.clipboardData).getData('text');
-  document.execCommand('insertText', false, t);
-});
+autosize();
+window.addEventListener('resize', autosize);
 
 if (!matchMedia('(hover: none)').matches) src.focus();
 
 function caretToEnd() {
-  const r = document.createRange();
-  r.selectNodeContents(src);
-  r.collapse(false);
-  const s = getSelection();
-  s.removeAllRanges();
-  s.addRange(r);
+  const n = src.value.length;
+  src.setSelectionRange(n, n);
 }
 
 function inputVisible() {
@@ -241,7 +262,7 @@ document.addEventListener('keydown', e => {
 });
 
 async function translateIt() {
-  const text = src.textContent.trim();
+  const text = src.value.trim();
   if (!text) return;
   go.disabled = true;
   go.textContent = '...';
@@ -289,21 +310,32 @@ function fit() {
     return d;
   });
 
-  // size each word so it spans the full width
-  const sizes = nodes.map(d => REF * (maxW / d.scrollWidth));
-  sizes.forEach((s, i) => nodes[i].style.fontSize = s + 'px');
+  // one size for every word: the largest that keeps the widest word inside
+  let size = Math.min(...nodes.map(d => REF * (maxW / d.scrollWidth)));
+  nodes.forEach(d => d.style.fontSize = size + 'px');
 
-  // scale everything down if the stack is taller than the poster
-  const total = el.scrollHeight;
-  if (total > maxH) {
-    const k = maxH / total;
-    sizes.forEach((s, i) => nodes[i].style.fontSize = (s * k) + 'px');
+  // scale down if the stack is taller than the poster
+  if (el.scrollHeight > maxH) {
+    size = size * (maxH / el.scrollHeight);
+    nodes.forEach(d => d.style.fontSize = size + 'px');
   }
 }
 
 window.addEventListener('resize', () => {
   if (document.getElementById('output-view').style.display === 'flex') fit();
 });
+
+function loadImg(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = function () {
+    const el = document.getElementById('bg');
+    el.src = r.result;
+    el.style.display = 'block';
+  };
+  r.readAsDataURL(f);
+}
 
 function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -339,7 +371,7 @@ function downloadPng() {
 
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">'
     + '<style>' + fontCss + '</style>'
-    + '<rect width="100%" height="100%" fill="#fff"/>' + body + '</svg>';
+    + body + '</svg>';
 
   const img = new Image();
   img.onload = function () {
@@ -348,8 +380,14 @@ function downloadPng() {
     c.width = Math.round(W * scale);
     c.height = Math.round(H * scale);
     const ctx = c.getContext('2d');
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, c.width, c.height);
+
+    const bg = document.getElementById('bg');
+    if (bg.src && bg.naturalWidth) {
+      const k = Math.max(c.width / bg.naturalWidth, c.height / bg.naturalHeight);
+      const dw = bg.naturalWidth * k, dh = bg.naturalHeight * k;
+      ctx.drawImage(bg, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
+    }
+
     ctx.drawImage(img, 0, 0, c.width, c.height);
     const dataUrl = c.toDataURL('image/png');
 
@@ -381,7 +419,13 @@ function downloadPng() {
 function reset() {
   document.getElementById('output-view').style.display = 'none';
   document.getElementById('input-view').style.display = 'flex';
-  src.innerHTML = '';
+  src.value = '';
+  autosize();
+  const bg = document.getElementById('bg');
+  bg.removeAttribute('src');
+  bg.style.display = 'none';
+  document.getElementById('imgfile').value = '';
+  words = [];
   count.textContent = '0 / 140';
   go.disabled = true;
   src.focus();
