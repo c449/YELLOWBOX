@@ -27,6 +27,8 @@ body {
   gap: 20px;
   padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
   overflow: clip;
 }
 
@@ -90,6 +92,7 @@ textarea::placeholder { color: #999; }
 
 #latin {
   font-family: 'cecilia', Georgia, serif;
+  font-weight: 400;
   width: 100%;
 }
 
@@ -112,20 +115,25 @@ textarea::placeholder { color: #999; }
 }
 
 .check input { cursor: pointer; accent-color: #000; }
+
+.row { display: flex; gap: 8px; align-items: center; }
 </style>
 </head>
 <body>
 
 <div id="input-view">
+  <button class="btn" id="go" onclick="translateIt()" disabled>Translate</button>
   <textarea id="src" maxlength="140" placeholder="Type here" autofocus></textarea>
   <div id="count">0 / 140</div>
   <label class="check"><input type="checkbox" id="special" onchange="fit()"> Special characters</label>
-  <button class="btn" id="go" onclick="translateIt()" disabled>Translate</button>
 </div>
 
 <div id="output-view">
   <div id="poster"><div id="latin"></div></div>
-  <button class="btn" onclick="reset()">Again</button>
+  <div class="row">
+    <button class="btn" onclick="reset()">Again</button>
+    <button class="btn" onclick="downloadPng()" aria-label="Download PNG">&#8595;</button>
+  </div>
 </div>
 
 <script>
@@ -202,6 +210,79 @@ function fit() {
 window.addEventListener('resize', () => {
   if (document.getElementById('output-view').style.display === 'flex') fit();
 });
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function downloadPng() {
+  const poster = document.getElementById('poster');
+  const W = poster.clientWidth, H = poster.clientHeight;
+  if (!W || !H) return;
+
+  let fontCss = '';
+  for (const sheet of document.styleSheets) {
+    let rules;
+    try { rules = sheet.cssRules; } catch (e) { continue; }
+    for (const rule of rules) {
+      if (rule.constructor.name === 'CSSFontFaceRule') fontCss += rule.cssText;
+    }
+  }
+
+  const pRect = poster.getBoundingClientRect();
+  let body = '';
+  document.querySelectorAll('#latin .word').forEach(n => {
+    const r = n.getBoundingClientRect();
+    const cs = getComputedStyle(n);
+    const cx = r.left - pRect.left + r.width / 2;
+    const cy = r.top - pRect.top + r.height / 2;
+    body += '<text x="' + cx + '" y="' + cy + '" font-size="' + parseFloat(cs.fontSize) + '"'
+      + ' text-anchor="middle" dominant-baseline="central"'
+      + ' style="font-family:cecilia;letter-spacing:' + cs.letterSpacing
+      + ';font-feature-settings:' + (cs.fontFeatureSettings || 'normal') + '">'
+      + esc(n.textContent) + '</text>';
+  });
+
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">'
+    + '<style>' + fontCss + '</style>'
+    + '<rect width="100%" height="100%" fill="#fff"/>' + body + '</svg>';
+
+  const img = new Image();
+  img.onload = function () {
+    const scale = 1200 / W;
+    const c = document.createElement('canvas');
+    c.width = Math.round(W * scale);
+    c.height = Math.round(H * scale);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const dataUrl = c.toDataURL('image/png');
+
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;';
+      const im = document.createElement('img');
+      im.src = dataUrl;
+      im.style.cssText = 'height:' + H + 'px;width:auto;max-width:90vw;display:block;';
+      const hint = document.createElement('p');
+      hint.textContent = 'Press & hold to save';
+      hint.style.cssText = "color:#000;font:700 12px/1 'Helvetica Neue',Helvetica,Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;padding:12px 0;";
+      ov.onclick = function () { document.body.removeChild(ov); };
+      ov.appendChild(im);
+      ov.appendChild(hint);
+      document.body.appendChild(ov);
+    } else {
+      const a = document.createElement('a');
+      a.download = 'latin.png';
+      a.href = dataUrl;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
 
 function reset() {
   document.getElementById('output-view').style.display = 'none';
