@@ -47,7 +47,7 @@ body {
   background: #fff;
   color: #000;
   font-family: inherit;
-  font-size: clamp(9px, 1.7vw, 13px);
+  font-size: clamp(11px, 1.7vw, 13px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -64,7 +64,7 @@ body {
 #src:empty::before { content: attr(data-ph); }
 
 #count {
-  font-size: clamp(9px, 1.7vw, 13px);
+  font-size: clamp(11px, 1.7vw, 13px);
   font-weight: 700;
   letter-spacing: 2px;
   color: #000;
@@ -75,7 +75,7 @@ body {
   border: none;
   color: #000;
   font-family: inherit;
-  font-size: clamp(9px, 1.7vw, 13px);
+  font-size: clamp(11px, 1.7vw, 13px);
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -137,7 +137,14 @@ body {
 
 .check input:checked { background: #000; }
 
-.row { display: flex; gap: 8px; align-items: center; }
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
 
 #go {
   background: #000;
@@ -198,7 +205,40 @@ src.addEventListener('paste', e => {
   document.execCommand('insertText', false, t);
 });
 
-src.focus();
+if (!matchMedia('(hover: none)').matches) src.focus();
+
+function caretToEnd() {
+  const r = document.createRange();
+  r.selectNodeContents(src);
+  r.collapse(false);
+  const s = getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+}
+
+function inputVisible() {
+  return document.getElementById('input-view').style.display !== 'none';
+}
+
+// clicking/tapping anywhere on the input screen puts the cursor in the text
+document.addEventListener('pointerdown', e => {
+  if (!inputVisible()) return;
+  if (e.target.closest('button, input, label')) return;
+  if (e.target === src || src.contains(e.target)) return;
+  if (e.pointerType === 'mouse') e.preventDefault();
+  src.focus();
+  caretToEnd();
+});
+
+// typing anywhere on the input screen goes into the text
+document.addEventListener('keydown', e => {
+  if (!inputVisible()) return;
+  if (document.activeElement === src) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key.length !== 1 && e.key !== 'Backspace') return;
+  src.focus();
+  caretToEnd();
+});
 
 async function translateIt() {
   const text = src.textContent.trim();
