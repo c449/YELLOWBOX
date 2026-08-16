@@ -4,9 +4,12 @@
 <title>Art Cars — A Timeline Wall, 1925–2025</title>
 <meta name="description" content="A horizontal museum timeline of 65 art cars, 1925-2025 - from Sonia Delaunay's painted Citroen to Nina Chanel Abney's Chevrolet C10.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://deusaderit.com/cart">
 <meta property="og:title" content="Art Cars - A Timeline Wall, 1925-2025">
 <meta property="og:description" content="65 works, hung chronologically on one very long wall. Scroll right.">
 <meta property="og:image" content="https://deusaderit.com/cart/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Art Cars - A Timeline Wall, 1925-2025">
 <meta name="twitter:description" content="65 works, hung chronologically on one very long wall. Scroll right.">
@@ -128,6 +131,35 @@ html,body{height:100%;overflow:hidden;background:var(--wall);color:var(--ink);
  .panel{padding:0 34px} .bay{padding:var(--padT) 20px 0} .bay:before{left:20px}
  #lb{flex-direction:column;gap:20px;padding:44px 24px} #lb img{max-width:88vw;max-height:46vh}
  #lbx{max-width:88vw} #nav{display:none}
+}
+@media (max-width:700px){
+ :root{--artH:min(36vh,300px);--padT:22px}
+ #wall{scroll-snap-type:x proximity;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+ #wall::-webkit-scrollbar{height:0}
+ .panel{width:100vw!important;scroll-snap-align:start;padding:26px;
+   justify-content:flex-start;overflow-y:auto}
+ .intro h1{font-size:clamp(36px,13vw,58px)}
+ .intro .rule{margin:18px 0 16px}
+ .intro .sub{font-size:11.5px;margin-bottom:18px;line-height:1.85}
+ .intro p{font-size:13px;line-height:1.6;max-width:none}
+ .intro p+p{margin-top:11px}
+ .intro .meta{margin-top:22px;font-size:9.5px;line-height:1.9}
+ .scrollcue{margin-top:18px;font-size:10px}
+ .outro p{font-size:12.5px;max-width:none}
+ .outro .c{font-size:9.5px}
+ .bay{width:100vw;scroll-snap-align:start;padding:var(--padT) 22px 0}
+ .bay:before{left:22px}
+ .art{justify-content:center}
+ .art figure:hover{transform:none}
+ .label{max-width:none;padding-top:22px}
+ .label h2{font-size:21px}
+ .ltitle{font-size:13.5px}
+ .lveh{font-size:10.5px;max-width:none}
+ .label p{font-size:12.6px;line-height:1.72}
+ .decade{width:88px}
+ .dnum{font-size:40px;left:12px} .dnum span{font-size:19px}
+ #bar{gap:12px;padding:0 15px}
+ #bar .brand span{display:none}
 }
 </style></head><body>
 
@@ -767,11 +799,12 @@ wall.addEventListener('wheel',e=>{
 /* drag to pan */
 let down=false,sx=0,sl=0,moved=0;
 wall.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='mouse') return;            /* let touch scroll natively */
   if(e.target.closest('.label p')) return;
   down=true;moved=0;sx=e.clientX;sl=wall.scrollLeft;wall.classList.add('drag');
 });
 wall.addEventListener('pointermove',e=>{
-  if(!down)return; const dx=e.clientX-sx; moved=Math.max(moved,Math.abs(dx));
+  if(!down||e.pointerType!=='mouse')return; const dx=e.clientX-sx; moved=Math.max(moved,Math.abs(dx));
   wall.scrollLeft=sl-dx;
 });
 addEventListener('pointerup',()=>{down=false;wall.classList.remove('drag')});
@@ -812,7 +845,7 @@ upd();
 /* lightbox */
 const lb=document.getElementById('lb'), lbimg=document.getElementById('lbimg'), lbx=document.getElementById('lbx');
 bays.forEach(b=>b.querySelector('.art figure').addEventListener('click',()=>{
-  if(moved>6) return;
+  if(moved>6 && down!==false) return;
   lbimg.src=b.querySelector('img').src;
   const L=b.querySelector('.label').cloneNode(true);
   L.querySelector('.lnum')?.remove();
