@@ -24,10 +24,8 @@ body{background:var(--wall);color:var(--ink);
   overflow-x:hidden;text-transform:uppercase;}
 .wrap{max-width:1180px;margin:0 auto;padding:44px 34px 70px}
 
-header{text-align:center;margin-bottom:6px}
+header{text-align:center;margin-bottom:10px}
 h1{font-size:clamp(46px,9vw,104px);font-weight:700;letter-spacing:.30em;text-indent:.30em;line-height:1}
-.sub{margin-top:16px;font-size:11px;letter-spacing:.20em;line-height:2}
-.sub em{font-style:italic}
 .hr{width:52px;height:1px;background:#000;margin:20px auto 0}
 
 .stage{display:grid;grid-template-columns:1fr 330px;gap:30px;align-items:start;margin-top:26px}
@@ -99,14 +97,12 @@ input[type=text]::placeholder{color:#000;opacity:.35}
 .acts button{flex:1;padding:12px 6px;background:transparent;border:1px solid #000;color:#000;
   font-family:inherit;font-size:9px;letter-spacing:.16em;text-transform:uppercase;cursor:pointer}
 .acts button:hover{background:rgba(0,0,0,.06)}
-.hint{margin-top:14px;font-size:9.5px;letter-spacing:.14em;line-height:2}
 
 .caption{margin-top:46px;text-align:center;font-size:10.5px;letter-spacing:.17em;line-height:2.1}
 .caption em{font-style:italic}
 
 @media (max-width:900px){
   .wrap{padding:28px 20px 116px}
-  .sub{font-size:10px;letter-spacing:.14em}
   .diagram svg{max-height:none}
   .strike{position:fixed;left:16px;right:16px;bottom:14px;width:auto;z-index:20;margin:0;
     background:rgba(255,255,255,.95);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
@@ -117,8 +113,6 @@ input[type=text]::placeholder{color:#000;opacity:.35}
 <div class="wrap">
 <header>
   <h1>COIN</h1>
-  <div class="sub">Interactive illustration showing coin minting<br>
-    <em>hold to raise the hammer &mdash; release to strike</em></div>
   <div class="hr"></div>
 </header>
 
@@ -196,13 +190,10 @@ input[type=text]::placeholder{color:#000;opacity:.35}
     <button id="dl">Download</button>
     <button id="again">New blank</button>
   </div>
-  <div class="hint">Hold longer for a heavier blow. Two or three good ones raise the full relief.
-    Space bar works too. Drag the blank to frame a picture.</div>
 </div>
 </div>
 
-<div class="caption">Illustration showing coin minting<br>
-  <em>after a museum panel &mdash; hammer, punch, dies, blank, anvil</em></div>
+<div class="caption">Illustration showing coin minting</div>
 </div>
 
 <script>
@@ -254,15 +245,21 @@ function buildCoin(root,name,S,uid){
   emb.appendChild(el("feDropShadow",{dx:"1.2",dy:"1.5",stdDeviation:".6","flood-color":GD,"flood-opacity":"1"}));
   emb.appendChild(el("feDropShadow",{dx:"-.9",dy:"-1.1",stdDeviation:".5","flood-color":GH,"flood-opacity":".85"}));
   defs.appendChild(emb);
+  /* Type needs its own treatment — the chained emboss haloes small glyphs
+     and fills their counters. Incuse instead: dark cut, one catch-light. */
+  const et=el("filter",{id:"et"+u,x:"-14%",y:"-14%",width:"128%",height:"128%"});
+  et.appendChild(el("feDropShadow",{dx:"-.5",dy:"-.7",stdDeviation:".3",
+    "flood-color":"#ffeeb6","flood-opacity":".95"}));
+  defs.appendChild(et);
   const gr=el("filter",{id:"t"+u,x:"-2%",y:"-2%",width:"104%",height:"104%"});
   gr.appendChild(el("feTurbulence",{type:"fractalNoise",baseFrequency:".85",numOctaves:"3",
     seed:String(h%1000),result:"n"}));
   gr.appendChild(el("feColorMatrix",{type:"saturate",values:"0",in:"n",result:"gy"}));
   gr.appendChild(el("feComposite",{in:"gy",in2:"SourceAlpha",operator:"in"}));
   defs.appendChild(gr);
-  defs.appendChild(el("path",{id:"tp"+u,d:"M -76,0 A 76 76 0 0 1 76,0",fill:"none"}));
-  defs.appendChild(el("path",{id:"bp"+u,d:"M -76,0 A 76 76 0 0 0 76,0",fill:"none"}));
-  const cp=el("clipPath",{id:"fc"+u});cp.appendChild(el("circle",{r:58}));defs.appendChild(cp);
+  defs.appendChild(el("path",{id:"tp"+u,d:"M -74,0 A 74 74 0 0 1 74,0",fill:"none"}));
+  defs.appendChild(el("path",{id:"bp"+u,d:"M -74,0 A 74 74 0 0 0 74,0",fill:"none"}));
+  const cp=el("clipPath",{id:"fc"+u});cp.appendChild(el("circle",{r:56}));defs.appendChild(cp);
   const vg=el("radialGradient",{id:"v"+u,cx:"50%",cy:"50%",r:"50%"});
   vg.appendChild(el("stop",{offset:"58%","stop-color":"#a67f2c","stop-opacity":"0"}));
   vg.appendChild(el("stop",{offset:"100%","stop-color":"#a67f2c","stop-opacity":".9"}));
@@ -280,28 +277,37 @@ function buildCoin(root,name,S,uid){
     const sz=116*(pzoom/100);
     hold.appendChild(el("image",{href:portrait,x:-sz/2+pox,y:-sz/2+poy,width:sz,height:sz,
       preserveAspectRatio:"xMidYMid slice","class":"pic"}));
-    hold.appendChild(el("circle",{r:58,fill:"url(#v"+u+")"}));
+    hold.appendChild(el("circle",{r:56,fill:"url(#v"+u+")"}));
     g.appendChild(hold);
   }
   const dev=el("g",{filter:"url(#e"+u+")",fill:"none",stroke:GM,"stroke-width":1.6});
   dev.appendChild(el("circle",{r:88,"stroke-width":1.8}));
-  dev.appendChild(el("circle",{r:62,"stroke-width":1.2}));
+  dev.appendChild(el("circle",{r:60,"stroke-width":1.2}));
   for(let i=0;i<64;i++){const a=i/64*6.283;
     dev.appendChild(el("circle",{cx:(Math.cos(a)*94).toFixed(2),cy:(Math.sin(a)*94).toFixed(2),
       r:1.5,fill:GM,stroke:"none"}))}
-  const arc=(pid,txt,size)=>{
-    const t=el("text",{fill:GM,stroke:"none","font-size":size,"letter-spacing":2.2,
+  const TXT="#120c01", ADV=.518, LS=2.2;
+  /* GOTHICC averages .518em per cap — size the legend to fill its arc */
+  const fit=(txt,maxS)=>{
+    const avail=Math.PI*74*.90;
+    return Math.max(11,Math.min(maxS,(avail/Math.max(1,txt.length)-LS)/ADV));
+  };
+  const arc=(pid,txt,maxS)=>{
+    const size=fit(txt,maxS);
+    const t=el("text",{fill:TXT,stroke:TXT,"stroke-width":(size*.062).toFixed(2),
+      "stroke-linejoin":"round","font-size":size.toFixed(1),"letter-spacing":LS,
       "font-family":COINF,"font-weight":"400"});
     const tp=el("textPath",{startOffset:"50%","text-anchor":"middle"});
     tp.setAttribute("href","#"+pid+u); tp.textContent=txt; t.appendChild(tp); dev.appendChild(t)};
-  arc("tp",(S==="o"?(name||"UNSTRUCK").toUpperCase():"VICTORIA").slice(0,16),17);
-  arc("bp",S==="o"?YEAR:"CONOB",14);
+  arc("tp",(S==="o"?(name||"UNSTRUCK").toUpperCase():"VICTORIA").slice(0,16),29);
+  arc("bp",S==="o"?YEAR:"CONOB",25);
   if(S==="o"){
     if(!portrait){
-      const m=el("text",{x:0,y:18,fill:GM,stroke:"none","font-size":56,"text-anchor":"middle",
-        "letter-spacing":2,"font-family":COINF,"font-weight":"400"});
+      const m=el("text",{x:0,y:23,fill:TXT,stroke:TXT,"stroke-width":"4.4","stroke-linejoin":"round",
+        "font-size":78,"text-anchor":"middle","letter-spacing":2,
+        "font-family":COINF,"font-weight":"400"});
       m.textContent=initials(name); dev.appendChild(m);
-      dev.appendChild(el("path",{d:"M -26 34 L 26 34","stroke-width":1.1}));
+      dev.appendChild(el("path",{d:"M -28 40 L 28 40","stroke-width":1.6}));
     }
   }else{
     const steps=3+(h%2), sw=13+((h>>4)%5), cr=el("g",{});
@@ -316,31 +322,53 @@ function buildCoin(root,name,S,uid){
   g.appendChild(dev); root.appendChild(g);
 }
 
-/* ---------------- photo -> struck bas-relief ---------------- */
+/* ---------------- photo -> a face simple enough to strike ----------------
+   A die cannot hold photographic detail. Auto-level, smooth the texture away,
+   quantise to a handful of planes, round the steps, then light them — which is
+   how an engraver reduces a likeness to something a punch can carry. */
+function blurF(src,S,r){
+  const N=S*S,t=new Float32Array(N),o=new Float32Array(N);
+  for(let y=0;y<S;y++){let s=0;
+    for(let k=-r;k<=r;k++)s+=src[y*S+Math.min(S-1,Math.max(0,k))];
+    for(let X=0;X<S;X++){t[y*S+X]=s/(2*r+1);
+      s+=src[y*S+Math.min(S-1,X+r+1)]-src[y*S+Math.max(0,X-r)]}}
+  for(let X=0;X<S;X++){let s=0;
+    for(let k=-r;k<=r;k++)s+=t[Math.min(S-1,Math.max(0,k))*S+X];
+    for(let y=0;y<S;y++){o[y*S+X]=s/(2*r+1);
+      s+=t[Math.min(S-1,y+r+1)*S+X]-t[Math.max(0,y-r)*S+X]}}
+  return o}
+
 function toRelief(img){
-  const S=560,c=document.createElement("canvas");c.width=c.height=S;
+  const S=512,PLANES=5,SMOOTH=4,ROUND=5,LIGHT=4,TONE=.95;
+  const c=document.createElement("canvas");c.width=c.height=S;
   const x=c.getContext("2d"),sc=Math.max(S/img.width,S/img.height);
-  const w=img.width*sc,h=img.height*sc;
-  x.drawImage(img,(S-w)/2,(S-h)/2,w,h);
-  const d=x.getImageData(0,0,S,S),p=d.data,N=S*S,lum=new Float32Array(N);
-  for(let i=0,j=0;j<N;i+=4,j++)lum[j]=(.299*p[i]+.587*p[i+1]+.114*p[i+2])/255;
-  const blur=(src,r)=>{const t=new Float32Array(N),o=new Float32Array(N);
-    for(let y=0;y<S;y++){let s=0;for(let k=-r;k<=r;k++)s+=src[y*S+Math.min(S-1,Math.max(0,k))];
-      for(let X=0;X<S;X++){t[y*S+X]=s/(2*r+1);
-        s+=src[y*S+Math.min(S-1,X+r+1)]-src[y*S+Math.max(0,X-r)]}}
-    for(let X=0;X<S;X++){let s=0;for(let k=-r;k<=r;k++)s+=t[Math.min(S-1,Math.max(0,k))*S+X];
-      for(let y=0;y<S;y++){o[y*S+X]=s/(2*r+1);
-        s+=t[Math.min(S-1,y+r+1)*S+X]-t[Math.max(0,y-r)*S+X]}}
-    return o};
-  const hm=blur(lum,2),soft=blur(lum,14);
+  x.drawImage(img,(S-img.width*sc)/2,(S-img.height*sc)/2,img.width*sc,img.height*sc);
+  const d=x.getImageData(0,0,S,S),px=d.data,N=S*S;
+  let lum=new Float32Array(N);
+  for(let i=0,j=0;j<N;i+=4,j++)lum[j]=(.299*px[i]+.587*px[i+1]+.114*px[i+2])/255;
+
+  /* auto-level off the 2nd/98th percentile so any exposure engraves the same */
+  const hist=new Array(256).fill(0);
+  for(let j=0;j<N;j++)hist[Math.round(lum[j]*255)]++;
+  let lo=0,hi=255,acc=0;
+  for(let i=0;i<256;i++){acc+=hist[i];if(acc>N*.02){lo=i;break}}
+  acc=0;for(let i=255;i>=0;i--){acc+=hist[i];if(acc>N*.02){hi=i;break}}
+  const rng=Math.max(1,hi-lo);
+  for(let j=0;j<N;j++)lum[j]=Math.min(1,Math.max(0,(lum[j]*255-lo)/rng));
+
+  let m=blurF(lum,S,SMOOTH);                                   /* lose the texture */
+  for(let j=0;j<N;j++)m[j]=Math.round(m[j]*(PLANES-1))/(PLANES-1);  /* few planes */
+  m=blurF(m,S,ROUND);                                          /* round the steps */
+
   for(let y=0;y<S;y++)for(let X=0;X<S;X++){
     const j=y*S+X,xm=X>0?j-1:j,xp=X<S-1?j+1:j,ym=y>0?j-S:j,yp=y<S-1?j+S:j;
-    const gx=hm[xp]-hm[xm],gy=hm[yp]-hm[ym];
-    let v=.5+(-gx*.72-gy*.72)*5.4+(hm[j]-soft[j])*1.5+(soft[j]-.5)*.30;
+    const gx=m[xp]-m[xm],gy=m[yp]-m[ym];
+    let v=.5+(-gx*.72-gy*.72)*LIGHT+(m[j]-.5)*TONE;
     v=v<0?0:v>1?1:v;
-    const i=j*4;p[i]=58+v*196;p[i+1]=42+v*190;p[i+2]=16+v*158;p[i+3]=255}
+    v=Math.pow(v,.80);                     /* lift the mids off the floor */
+    const i=j*4;px[i]=74+v*180;px[i+1]=56+v*176;px[i+2]=24+v*148;px[i+3]=255}
   x.putImageData(d,0,0);
-  return c.toDataURL("image/jpeg",.9)}
+  return c.toDataURL("image/jpeg",.92)}
 
 function loadPic(f){
   if(!f||!/^image\//.test(f.type))return;
