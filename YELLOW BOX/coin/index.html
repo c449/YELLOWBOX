@@ -234,23 +234,21 @@ function flan(h,R){
 /* ---- draw the coin into any container, radius 100 ---- */
 function buildCoin(root,name,S,uid){
   while(root.firstChild)root.removeChild(root.firstChild);
-  const h=hash((name||"blank").toUpperCase()+S), GM="#d9b455", GD="#7a5a1c", GH="#fdf3cd";
+  const h=hash((name||"blank").toUpperCase()+S), GM="#a87b18", GD="#4a3206", GH="#fff8d4";
   const u=uid||"x";
   const defs=el("defs",{});
   const lg=el("radialGradient",{id:"g"+u,cx:"34%",cy:"27%",r:"82%"});
   [["0%","#f7e7b0"],["26%","#e6cb7d"],["58%","#cfa845"],["84%","#a67f2c"],["100%","#7d5c1d"]]
     .forEach(([o,c])=>lg.appendChild(el("stop",{offset:o,"stop-color":c})));
   defs.appendChild(lg);
-  const emb=el("filter",{id:"e"+u,x:"-12%",y:"-12%",width:"124%",height:"124%"});
-  emb.appendChild(el("feDropShadow",{dx:"1.2",dy:"1.5",stdDeviation:".6","flood-color":GD,"flood-opacity":"1"}));
-  emb.appendChild(el("feDropShadow",{dx:"-.9",dy:"-1.1",stdDeviation:".5","flood-color":GH,"flood-opacity":".85"}));
+  /* Debossed, not embossed: the shape is a groove in the metal, so the
+     upper-left lip falls into shade and the lower-right wall catches light. */
+  const emb=el("filter",{id:"e"+u,x:"-14%",y:"-14%",width:"128%",height:"128%"});
+  emb.appendChild(el("feDropShadow",{dx:"-1.4",dy:"-1.7",stdDeviation:".5",
+    "flood-color":GD,"flood-opacity":"1"}));
+  emb.appendChild(el("feDropShadow",{dx:"1.4",dy:"1.7",stdDeviation:".45",
+    "flood-color":GH,"flood-opacity":"1"}));
   defs.appendChild(emb);
-  /* Type needs its own treatment — the chained emboss haloes small glyphs
-     and fills their counters. Incuse instead: dark cut, one catch-light. */
-  const et=el("filter",{id:"et"+u,x:"-14%",y:"-14%",width:"128%",height:"128%"});
-  et.appendChild(el("feDropShadow",{dx:"-.5",dy:"-.7",stdDeviation:".3",
-    "flood-color":"#ffeeb6","flood-opacity":".95"}));
-  defs.appendChild(et);
   const gr=el("filter",{id:"t"+u,x:"-2%",y:"-2%",width:"104%",height:"104%"});
   gr.appendChild(el("feTurbulence",{type:"fractalNoise",baseFrequency:".85",numOctaves:"3",
     seed:String(h%1000),result:"n"}));
@@ -286,7 +284,7 @@ function buildCoin(root,name,S,uid){
   for(let i=0;i<64;i++){const a=i/64*6.283;
     dev.appendChild(el("circle",{cx:(Math.cos(a)*94).toFixed(2),cy:(Math.sin(a)*94).toFixed(2),
       r:1.5,fill:GM,stroke:"none"}))}
-  const TXT="#120c01", ADV=.518, LS=2.2;
+  const TXT="#8a6414", ADV=.518, LS=2.2;
   /* GOTHICC averages .518em per cap — size the legend to fill its arc */
   const fit=(txt,maxS)=>{
     const avail=Math.PI*74*.90;
@@ -296,7 +294,7 @@ function buildCoin(root,name,S,uid){
     const size=fit(txt,maxS);
     const t=el("text",{fill:TXT,stroke:TXT,"stroke-width":(size*.062).toFixed(2),
       "stroke-linejoin":"round","font-size":size.toFixed(1),"letter-spacing":LS,
-      "font-family":COINF,"font-weight":"400"});
+      "font-family":COINF,"font-weight":"400",filter:"url(#e"+u+")"});
     const tp=el("textPath",{startOffset:"50%","text-anchor":"middle"});
     tp.setAttribute("href","#"+pid+u); tp.textContent=txt; t.appendChild(tp); dev.appendChild(t)};
   arc("tp",(S==="o"?(name||"UNSTRUCK").toUpperCase():"VICTORIA").slice(0,16),29);
@@ -305,7 +303,7 @@ function buildCoin(root,name,S,uid){
     if(!portrait){
       const m=el("text",{x:0,y:23,fill:TXT,stroke:TXT,"stroke-width":"4.4","stroke-linejoin":"round",
         "font-size":78,"text-anchor":"middle","letter-spacing":2,
-        "font-family":COINF,"font-weight":"400"});
+        "font-family":COINF,"font-weight":"400",filter:"url(#e"+u+")"});
       m.textContent=initials(name); dev.appendChild(m);
       dev.appendChild(el("path",{d:"M -28 40 L 28 40","stroke-width":1.6}));
     }
