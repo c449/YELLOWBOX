@@ -19,8 +19,8 @@
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --wall:#faf9f6; --wall2:#f2f1ec;
-  --ink:#16160f; --dim:#75736a; --faint:#a8a59c;
-  --line:#16160f;
+  --ink:#000; --dim:#000; --faint:#000;
+  --line:#000;
   --gold-d:#7a5a1c; --gold-m:#d9b455; --gold-h:#fdf3cd;
 }
 html,body{height:100%}
@@ -43,7 +43,7 @@ header{text-align:center;margin-bottom:16px}
 h1{font-size:clamp(46px,9vw,104px);font-weight:700;letter-spacing:.30em;
    text-indent:.30em;line-height:1;margin-bottom:16px}
 .sub{font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:var(--dim);line-height:2}
-.sub em{font-style:italic;color:var(--faint)}
+.sub em{font-style:italic;color:#000}
 .hr{width:52px;height:1px;background:var(--faint);margin:22px auto 0}
 
 /* ---------- layout ---------- */
@@ -61,11 +61,11 @@ h1{font-size:clamp(46px,9vw,104px);font-weight:700;letter-spacing:.30em;
 /* svg primitives */
 .ln{fill:none;stroke:var(--line);stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round}
 .ln.thin{stroke-width:.9}
-.hatch{stroke:var(--line);stroke-width:.55;opacity:.5}
-.lead{stroke:var(--line);stroke-width:.7;opacity:.6;fill:none}
-.lab{fill:var(--ink);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
-     font-family:inherit;opacity:.92}
-.tick{fill:var(--ink);opacity:.8}
+.hatch{stroke:#000;stroke-width:.5;opacity:1}
+.lead{stroke:#000;stroke-width:.8;opacity:1;fill:none}
+.lab{fill:#000;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+     font-family:inherit;opacity:1}
+.tick{fill:#000;opacity:1}
 
 #hammer{transform-box:fill-box;transform-origin:88% 62%;
         transition:transform .34s cubic-bezier(.22,.61,.36,1)}
@@ -76,9 +76,9 @@ h1{font-size:clamp(46px,9vw,104px);font-weight:700;letter-spacing:.30em;
 @keyframes spk{0%{opacity:1;transform:scale(.2)}100%{opacity:0;transform:scale(1.25)}}
 
 /* ---------- right column ---------- */
-.panel{border-left:1px solid rgba(22,22,15,.14);padding-left:26px}
+.panel{border-left:1px solid #000;padding-left:26px}
 @media (max-width:900px){.panel{border-left:0;padding-left:0;
-  border-top:1px solid rgba(22,22,15,.14);padding-top:30px}}
+  border-top:1px solid #000;padding-top:30px}}
 @media (max-width:900px){
   .wrap{padding:30px 22px 120px}
   .sub{font-size:10px;letter-spacing:.14em}
@@ -89,29 +89,29 @@ h1{font-size:clamp(46px,9vw,104px);font-weight:700;letter-spacing:.30em;
     margin:0;padding:20px 14px;background:rgba(250,249,246,.94);
     -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
     box-shadow:0 -6px 26px rgba(0,0,0,.10)}
-  .strike.charging{background:rgba(22,22,15,.09)}
+  .strike.charging{background:#000}
   .acts{margin-top:26px}
   .caption{margin-bottom:40px}
 }
 .plabel{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:11px}
 
-input[type=text]{width:100%;background:transparent;border:0;border-bottom:1px solid rgba(22,22,15,.3);
+input[type=text]{width:100%;background:transparent;border:0;border-bottom:1px solid #000;
   color:var(--ink);font-family:inherit;font-size:19px;letter-spacing:.13em;text-transform:uppercase;
   padding:7px 0 9px;outline:none;transition:border-color .25s}
 input[type=text]:focus{border-color:var(--ink)}
 input[type=text]::placeholder{color:var(--faint);letter-spacing:.13em}
 
 /* portrait control */
-.drop{display:block;margin-top:22px;border:1px dashed rgba(22,22,15,.28);padding:16px 14px;text-align:center;
+.drop{display:block;margin-top:22px;border:1px dashed #000;padding:16px 14px;text-align:center;
   cursor:pointer;transition:.22s;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
-.drop:hover,.drop.over{border-color:var(--ink);color:var(--ink);background:rgba(22,22,15,.05)}
+.drop:hover,.drop.over{border-color:var(--ink);color:var(--ink);background:transparent}
 .drop input{display:none}
 .pctl{margin-top:14px;display:none}
 .pctl.on{display:block}
 .prow{display:flex;align-items:center;gap:12px;font-size:9.5px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--dim)}
 .prow input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:2px;
-  background:rgba(22,22,15,.2);outline:none;cursor:pointer}
+  background:rgba(0,0,0,.2);outline:none;cursor:pointer}
 .prow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;
   border-radius:50%;background:var(--ink);cursor:pointer}
 .prow input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--ink)}
@@ -132,29 +132,29 @@ input[type=text]::placeholder{color:var(--faint);letter-spacing:.13em}
 .meter{margin-top:26px}
 .mrow{display:flex;justify-content:space-between;font-size:9.5px;letter-spacing:.18em;
       text-transform:uppercase;color:var(--dim);margin-bottom:7px}
-.bar{height:2px;background:rgba(22,22,15,.16);position:relative;overflow:hidden}
+.bar{height:7px;border:1px solid #000;background:transparent;position:relative;overflow:hidden}
 .bar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--ink);display:block}
 #force i{transition:width .05s linear}
 #relief i{transition:width .45s cubic-bezier(.2,.8,.2,1)}
 
 .strike{margin-top:26px;width:100%;padding:19px 16px;background:transparent;
-  border:1px solid rgba(22,22,15,.35);color:var(--ink);font-family:inherit;
+  border:1px solid #000;color:var(--ink);font-family:inherit;
   font-size:11px;letter-spacing:.22em;text-transform:uppercase;cursor:pointer;
   transition:.22s;user-select:none;-webkit-user-select:none;touch-action:none}
-.strike:hover{border-color:var(--ink);background:rgba(22,22,15,.05)}
-.strike.charging{background:rgba(22,22,15,.11);border-color:var(--ink)}
-.strike[disabled]{opacity:.4;cursor:default}
+.strike:hover{border-color:var(--ink);background:transparent}
+.strike.charging{background:#000;border-color:var(--ink)}
+.strike[disabled]{cursor:default;background:#000;color:#faf9f6;border-color:#000}
 
 .acts{margin-top:16px;display:flex;gap:10px}
-.acts button{flex:1;padding:13px 10px;background:transparent;border:1px solid rgba(22,22,15,.22);
+.acts button{flex:1;padding:13px 10px;background:transparent;border:1px solid #000;
   color:var(--dim);font-family:inherit;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
   cursor:pointer;transition:.22s}
-.acts button:hover{color:var(--ink);border-color:rgba(22,22,15,.5)}
-.hint{margin-top:16px;font-size:10px;letter-spacing:.1em;color:var(--faint);line-height:1.9}
+.acts button:hover{color:var(--ink);border-color:rgba(0,0,0,.5)}
+.hint{margin-top:16px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#000;line-height:2}
 
 .caption{margin-top:54px;text-align:center;font-size:10.5px;letter-spacing:.17em;
   text-transform:uppercase;color:var(--dim);line-height:2.1}
-.caption em{font-style:italic;color:var(--faint);text-transform:none;letter-spacing:.06em}
+.caption em{font-style:italic;color:#000;text-transform:uppercase;letter-spacing:.14em}
 
 .done{opacity:0;transition:opacity .5s;font-size:10px;letter-spacing:.24em;
   text-transform:uppercase;color:var(--ink);margin-top:14px}
@@ -182,7 +182,7 @@ input[type=text]::placeholder{color:var(--faint);letter-spacing:.13em}
         <line x1="0" y1="0" x2="0" y2="6" class="hatch"/>
       </pattern>
       <pattern id="steel2" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(48)">
-        <line x1="0" y1="0" x2="0" y2="3.4" class="hatch" opacity=".75"/>
+        <line x1="0" y1="0" x2="0" y2="3.4" class="hatch"/>
       </pattern>
     </defs>
 
@@ -190,13 +190,13 @@ input[type=text]::placeholder{color:var(--faint);letter-spacing:.13em}
     <g id="hammer">
       <!-- handle -->
       <path class="ln" d="M347 84 L497 27 L503 44 L353 101 Z"/>
-      <rect x="360" y="60" width="140" height="26" fill="url(#wood)" opacity=".5"
+      <rect x="360" y="60" width="140" height="26" fill="url(#wood)"
             transform="rotate(-21 360 60)"/>
       <!-- head -->
       <path class="ln" d="M252 62 L350 62 L350 120 L252 120 Z"/>
       <path class="ln" d="M252 62 L262 55 L360 55 L350 62"/>
       <path class="ln" d="M350 62 L360 55 L360 113 L350 120"/>
-      <rect x="256" y="66" width="90" height="50" fill="url(#steel)" opacity=".55"/>
+      <rect x="256" y="66" width="90" height="50" fill="url(#steel)"/>
       <!-- striking face -->
       <path class="ln thin" d="M258 116 L344 116"/>
     </g>
@@ -214,12 +214,12 @@ input[type=text]::placeholder{color:var(--faint);letter-spacing:.13em}
       <ellipse class="ln" cx="300" cy="152" rx="33" ry="9"/>
       <path class="ln" d="M267 152 L267 366"/>
       <path class="ln" d="M333 152 L333 366"/>
-      <rect x="269" y="156" width="62" height="206" fill="url(#steel2)" opacity=".42"/>
-      <path class="ln thin" d="M283 160 L283 356" opacity=".45"/>
+      <rect x="269" y="156" width="62" height="206" fill="url(#steel2)"/>
+      <path class="ln thin" d="M283 160 L283 356"/>
       <ellipse class="ln" cx="300" cy="366" rx="33" ry="9"/>
       <!-- reverse die band -->
       <path class="ln thin" d="M267 334 L333 334"/>
-      <rect x="269" y="336" width="62" height="28" fill="url(#steel)" opacity=".8"/>
+      <rect x="269" y="336" width="62" height="28" fill="url(#steel)"/>
 
       <!-- tongs / holder -->
       <path class="ln" d="M200 246 L268 252 L268 272 L200 266 Z"/>
@@ -237,7 +237,7 @@ input[type=text]::placeholder{color:var(--faint);letter-spacing:.13em}
     <g>
       <ellipse class="ln" cx="300" cy="404" rx="30" ry="8"/>
       <path class="ln" d="M270 404 L270 436 M330 404 L330 436"/>
-      <rect x="272" y="408" width="56" height="28" fill="url(#steel)" opacity=".5"/>
+      <rect x="272" y="408" width="56" height="28" fill="url(#steel)"/>
       <path class="ln" d="M270 436 A30 8 0 0 0 330 436"/>
     </g>
 
@@ -245,8 +245,8 @@ input[type=text]::placeholder{color:var(--faint);letter-spacing:.13em}
     <g>
       <path class="ln" d="M196 440 L404 440 L376 458 L224 458 Z"/>
       <path class="ln" d="M224 458 L376 458 L376 536 L224 536 Z"/>
-      <rect x="227" y="461" width="146" height="72" fill="url(#wood)" opacity=".7"/>
-      <path class="ln thin" d="M224 536 L212 548 L388 548 L376 536" opacity=".7"/>
+      <rect x="227" y="461" width="146" height="72" fill="url(#wood)"/>
+      <path class="ln thin" d="M224 536 L212 548 L388 548 L376 536"/>
     </g>
 
     <!-- ---- LABELS ---- -->
@@ -441,13 +441,13 @@ function buildFace(svg,name,side){
 
   const legend=(S==="o") ? (name||"UNSTRUCK").toUpperCase() : "VICTORIA";
   const t1=el("text",{fill:GM,stroke:"none","font-size":13.5,"letter-spacing":3.2,
-    "font-family":"Georgia,'Times New Roman',serif","font-weight":"700"});
+    "font-family":"Helvetica Neue,Helvetica,Arial,sans-serif","font-weight":"700"});
   const tp1=el("textPath",{startOffset:"50%","text-anchor":"middle"});
   tp1.setAttribute("href","#tp"+S); tp1.textContent=legend.slice(0,18);
   t1.appendChild(tp1); dev.appendChild(t1);
 
   const t2=el("text",{fill:GM,stroke:"none","font-size":11,"letter-spacing":3,
-    "font-family":"Georgia,'Times New Roman',serif","font-weight":"700"});
+    "font-family":"Helvetica Neue,Helvetica,Arial,sans-serif","font-weight":"700"});
   const tp2=el("textPath",{startOffset:"50%","text-anchor":"middle"});
   tp2.setAttribute("href","#bp"+S); tp2.textContent = S==="o" ? YEAR : "CONOB";
   t2.appendChild(tp2); dev.appendChild(t2);
@@ -455,7 +455,7 @@ function buildFace(svg,name,side){
   if(S==="o"){
     if(!portrait){
       const mono=el("text",{x:0,y:18,fill:GM,stroke:"none","font-size":54,"text-anchor":"middle",
-        "font-family":"Georgia,'Times New Roman',serif","font-weight":"700"});
+        "font-family":"Helvetica Neue,Helvetica,Arial,sans-serif","font-weight":"700"});
       mono.textContent=initials(name); dev.appendChild(mono);
       dev.appendChild(el("path",{d:"M -24 33 L 24 33","stroke-width":1.1}));
     }
