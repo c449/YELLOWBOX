@@ -50,7 +50,10 @@ h1{font-size:clamp(46px,9vw,104px);font-weight:700;letter-spacing:.30em;text-ind
 #hammer.slam{transition:transform .07s cubic-bezier(.5,0,.9,.3)}
 #punch{transition:transform .13s ease-out}
 #coinG{transition:transform .16s ease-out}
+#coinG.rise{transition:transform .95s cubic-bezier(.16,.9,.24,1)}
 #coinG.flip{transition:transform .28s ease-in}
+#hammer,#punch,#labels{transition:opacity .7s ease}
+.revealed #hammer,.revealed #punch,.revealed #labels{opacity:.10}
 #sparks line{stroke:#000;stroke-width:1.2;stroke-linecap:round;opacity:0}
 #sparks.go line{animation:spk .38s ease-out}
 @keyframes spk{0%{opacity:1;transform:scale(.2)}100%{opacity:0;transform:scale(1.25)}}
@@ -121,7 +124,6 @@ input[type=text]::placeholder{color:#000;opacity:.35}
 <div class="diagram" id="diagram">
 <svg viewBox="0 -44 560 748" id="machine" role="img" aria-label="Hand-struck coin minting">
 
-  <!-- HAMMER -->
   <g id="hammer">
     <path class="solid" d="M347 42 L497 -15 L503 2 L353 59 Z"/>
     <path class="solid" d="M252 20 L262 13 L360 13 L360 71 L350 78 L252 78 Z"/>
@@ -134,37 +136,35 @@ input[type=text]::placeholder{color:#000;opacity:.35}
     <line x1="0" y1="0" x2="-8" y2="-36"/><line x1="0" y1="0" x2="8" y2="-36"/>
   </g>
 
-  <!-- PUNCH, with the reverse die seated in its lower end -->
   <g id="punch">
-    <path class="solid" d="M267 102 A33 9 0 0 1 333 102 L333 268 A33 9 0 0 1 267 268 Z"/>
-    <path class="solid" d="M188 168 L268 175 L268 195 L188 188 Z"/>
-    <path class="solid" d="M332 175 L412 168 L412 188 L332 195 Z"/>
-    <path class="seam" d="M268 236 L332 236"/>
+    <path class="solid" d="M267 102 A33 9 0 0 1 333 102 L333 356 A33 9 0 0 1 267 356 Z"/>
+    <path class="solid" d="M188 200 L268 207 L268 227 L188 220 Z"/>
+    <path class="solid" d="M332 207 L412 200 L412 220 L332 227 Z"/>
+    <path class="seam" d="M268 324 L332 324"/>
   </g>
 
-  <!-- OBVERSE DIE -->
-  <path class="solid" d="M208 464 A92 19 0 0 1 392 464 L392 512 A92 19 0 0 1 208 512 Z"/>
+  <!-- obverse die, seated in the anvil -->
+  <path class="solid" d="M208 386 A92 19 0 0 1 392 386 L392 434 A92 19 0 0 1 208 434 Z"/>
+  <path class="solid" d="M170 442 L430 442 L396 464 L396 560 L412 576 L188 576 L204 560 L204 464 Z"/>
 
-  <!-- ANVIL -->
-  <path class="solid" d="M170 520 L430 520 L396 542 L396 638 L412 654 L188 654 L204 638 L204 542 Z"/>
+  <!-- the blank: lying flat on the die until it has been struck -->
+  <g id="coinG" transform="translate(300,378) scale(0.86,0.15)"></g>
 
-  <!-- THE BLANK, struck where it sits -->
-  <g id="coinG" transform="translate(300,372) scale(0.86)"></g>
-
-  <!-- LABELS -->
-  <g>
-    <text class="lab" x="176" y="52" text-anchor="end">Hammer</text>
-    <path class="lead" d="M184 48 L252 48"/><circle class="tick" cx="252" cy="48" r="1.9"/>
-    <text class="lab" x="430" y="146" text-anchor="start">Punch</text>
-    <path class="lead" d="M422 142 L333 142"/><circle class="tick" cx="333" cy="142" r="1.9"/>
-    <text class="lab" x="430" y="256" text-anchor="start">Reverse die</text>
-    <path class="lead" d="M422 252 L333 252"/><circle class="tick" cx="333" cy="252" r="1.9"/>
-    <text class="lab" x="176" y="372" text-anchor="end">Coin blank</text>
-    <path class="lead" d="M184 368 L213 370"/><circle class="tick" cx="213" cy="370" r="1.9"/>
-    <text class="lab" x="430" y="482" text-anchor="start">Obverse die</text>
-    <path class="lead" d="M422 478 L392 478"/><circle class="tick" cx="392" cy="478" r="1.9"/>
-    <text class="lab" x="176" y="596" text-anchor="end">Anvil</text>
-    <path class="lead" d="M184 592 L204 592"/><circle class="tick" cx="204" cy="592" r="1.9"/>
+  <g id="labels">
+    <g id="mlabels">
+      <text class="lab" x="176" y="52" text-anchor="end">Hammer</text>
+      <path class="lead" d="M184 48 L252 48"/><circle class="tick" cx="252" cy="48" r="1.9"/>
+      <text class="lab" x="430" y="150" text-anchor="start">Punch</text>
+      <path class="lead" d="M422 146 L333 146"/><circle class="tick" cx="333" cy="146" r="1.9"/>
+      <text class="lab" x="430" y="340" text-anchor="start">Reverse die</text>
+      <path class="lead" d="M422 336 L333 336"/><circle class="tick" cx="333" cy="336" r="1.9"/>
+    </g>
+    <text class="lab" x="176" y="378" text-anchor="end">Coin blank</text>
+    <path class="lead" d="M184 374 L226 376"/><circle class="tick" cx="226" cy="376" r="1.9"/>
+    <text class="lab" x="430" y="404" text-anchor="start">Obverse die</text>
+    <path class="lead" d="M422 400 L392 400"/><circle class="tick" cx="392" cy="400" r="1.9"/>
+    <text class="lab" x="176" y="518" text-anchor="end">Anvil</text>
+    <path class="lead" d="M184 514 L204 514"/><circle class="tick" cx="204" cy="514" r="1.9"/>
   </g>
 </svg>
 </div>
@@ -206,15 +206,15 @@ const GOTHICC_URL="url(data:font/woff2;base64,"+GOTHICC_B64+") format('woff2')";
 const FONT_CSS="@font-face{font-family:'GOTHICC';src:"+GOTHICC_URL+";font-display:block}";
 function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e}
 function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
-function roman(n){const m=[[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],[50,"L"],
- [40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]];let o="";
- for(const[v,s]of m)while(n>=v){o+=s;n-=v}return o}
 const YEAR=roman(new Date().getFullYear());
 function initials(n){const w=(n||"").trim().split(/\s+/).filter(Boolean);
  if(!w.length)return"✦";if(w.length===1)return w[0].slice(0,2).toUpperCase();
  return (w[0][0]+w[w.length-1][0]).toUpperCase()}
 
-let relief=0,charge=0,charging=false,raf=0,t0=0,busy=false,face="o";
+let relief=0,charge=0,charging=false,raf=0,t0=0,busy=false,face="o",shown=false;
+const LAID="translate(300px,378px) scale(0.86,0.15)",
+      HIT ="translate(300px,378px) scale(0.86,0.09)",
+      UP  ="translate(300px,300px) scale(0.86,0.86)";
 let portrait=null,pzoom=128,pox=0,poy=0;
 const COINF="GOTHICC,Helvetica Neue,Helvetica,Arial,sans-serif";
 
@@ -231,93 +231,160 @@ function flan(h,R){
     d+=" Q"+c[0].toFixed(2)+","+c[1].toFixed(2)+" "+q[0].toFixed(2)+","+q[1].toFixed(2)}
   return d+" Z"}
 
-/* ---- draw the coin into any container, radius 100 ---- */
+/* ---- Roman conventions, c.100 BC - AD 400 ----
+   Legends run CONTINUOUSLY clockwise around the rim (the split top/bottom arc
+   is a modern habit). Obverse formula D N ... P F AVG. Reverse carries a real
+   type legend, a votive wreath, a ground line, and an exergue holding the mint
+   and officina. V stands for U; there is no J, U or W. Strikes sit off-centre. */
+const MINTS=["SMK","SMN","SMANT","CONS","PTR","PLG","AQ","SIS","ALE","RP","TES","SMH"];
+const OFFICINA=["A","B","G","D","E","S","Z","H"];
+const REVLEG=["GLORIA EXERCITVS","FEL TEMP REPARATIO","SALVS REIPVBLICAE",
+  "SECVRITAS REIPVBLICAE","VICTORIA AVGGG","GLORIA ROMANORVM",
+  "CONCORDIA MILITVM","VIRTVS EXERCITI","PROVIDENTIAE AVGG"];
+
+/* V for U, I for J, VV for W — the Latin alphabet had 23 letters */
+function romanize(t){
+  return (t||"").toUpperCase().replace(/W/g,"VV").replace(/U/g,"V").replace(/J/g,"I")
+    .replace(/[^A-Z0-9 ]/g,"").replace(/\s+/g," ").trim();
+}
+function roman(n){const m=[[1000,"M"],[900,"CM"],[500,"D"],[400,"CD"],[100,"C"],[90,"XC"],
+ [50,"L"],[40,"XL"],[10,"X"],[9,"IX"],[5,"V"],[4,"IV"],[1,"I"]];let o="";
+ for(const[v,s]of m)while(n>=v){o+=s;n-=v}return o}
+
+/* a full circle, clockwise, starting at the bottom so 50% lands at the top */
+function ring(R){
+  return "M 0,"+R+" A "+R+","+R+" 0 0 1 0,"+(-R)+" A "+R+","+R+" 0 0 1 0,"+R;
+}
+
+/* laurel wreath: two branches opening at the top, tied at the foot */
+function wreath(col,R,cy){
+  const g=el("g",{transform:"translate(0,"+cy+")"});
+  const rad=d=>d*Math.PI/180;
+  [[92,248,-1],[88,-68,1]].forEach(([a0,a1,side])=>{
+    const N=9;
+    let d="";
+    for(let i=0;i<=N;i++){
+      const a=rad(a0+(a1-a0)*i/N), x=Math.cos(a)*R, y=Math.sin(a)*R;
+      d+=(i?"L":"M")+x.toFixed(1)+","+y.toFixed(1)+" ";
+    }
+    g.appendChild(el("path",{d:d,fill:"none",stroke:col,"stroke-width":2.4}));
+    for(let i=0;i<N;i++){
+      const t=(i+.5)/N, a=rad(a0+(a1-a0)*t);
+      const x=Math.cos(a)*R, y=Math.sin(a)*R;
+      const tang=(a0+(a1-a0)*t)+90*side+22*side;
+      g.appendChild(el("ellipse",{cx:x.toFixed(1),cy:y.toFixed(1),rx:7.2,ry:3.1,
+        fill:col,stroke:"none",transform:"rotate("+tang.toFixed(1)+" "+x.toFixed(1)+" "+y.toFixed(1)+")"}));
+    }
+  });
+  /* tie */
+  g.appendChild(el("path",{d:"M -7 "+(R-2)+" Q 0 "+(R+6)+" 7 "+(R-2),
+    fill:"none",stroke:col,"stroke-width":2.2}));
+  return g;
+}
+
 function buildCoin(root,name,S,uid){
   while(root.firstChild)root.removeChild(root.firstChild);
-  const h=hash((name||"blank").toUpperCase()+S), GM="#a87b18", GD="#4a3206", GH="#fff8d4";
-  const u=uid||"x";
+  const h=hash((name||"blank").toUpperCase()+S), u=uid||"x";
+  const GM="#a87b18", GD="#4a3206", GH="#fff8d4", TXT="#8a6414";
+  const LEGR=68, ADV=.518, LS=2.2;
+
   const defs=el("defs",{});
   const lg=el("radialGradient",{id:"g"+u,cx:"34%",cy:"27%",r:"82%"});
   [["0%","#f7e7b0"],["26%","#e6cb7d"],["58%","#cfa845"],["84%","#a67f2c"],["100%","#7d5c1d"]]
     .forEach(([o,c])=>lg.appendChild(el("stop",{offset:o,"stop-color":c})));
   defs.appendChild(lg);
-  /* Debossed, not embossed: the shape is a groove in the metal, so the
-     upper-left lip falls into shade and the lower-right wall catches light. */
+
+  /* debossed: shade on the upper-left lip, catch-light on the lower-right */
   const emb=el("filter",{id:"e"+u,x:"-14%",y:"-14%",width:"128%",height:"128%"});
   emb.appendChild(el("feDropShadow",{dx:"-1.4",dy:"-1.7",stdDeviation:".5",
     "flood-color":GD,"flood-opacity":"1"}));
   emb.appendChild(el("feDropShadow",{dx:"1.4",dy:"1.7",stdDeviation:".45",
     "flood-color":GH,"flood-opacity":"1"}));
   defs.appendChild(emb);
+
   const gr=el("filter",{id:"t"+u,x:"-2%",y:"-2%",width:"104%",height:"104%"});
   gr.appendChild(el("feTurbulence",{type:"fractalNoise",baseFrequency:".85",numOctaves:"3",
     seed:String(h%1000),result:"n"}));
   gr.appendChild(el("feColorMatrix",{type:"saturate",values:"0",in:"n",result:"gy"}));
   gr.appendChild(el("feComposite",{in:"gy",in2:"SourceAlpha",operator:"in"}));
   defs.appendChild(gr);
-  defs.appendChild(el("path",{id:"tp"+u,d:"M -74,0 A 74 74 0 0 1 74,0",fill:"none"}));
-  defs.appendChild(el("path",{id:"bp"+u,d:"M -74,0 A 74 74 0 0 0 74,0",fill:"none"}));
-  const cp=el("clipPath",{id:"fc"+u});cp.appendChild(el("circle",{r:56}));defs.appendChild(cp);
+
+  defs.appendChild(el("path",{id:"lg"+u,d:ring(LEGR),fill:"none"}));
+  const cp=el("clipPath",{id:"fc"+u});cp.appendChild(el("circle",{r:52}));defs.appendChild(cp);
   const vg=el("radialGradient",{id:"v"+u,cx:"50%",cy:"50%",r:"50%"});
-  vg.appendChild(el("stop",{offset:"58%","stop-color":"#a67f2c","stop-opacity":"0"}));
-  vg.appendChild(el("stop",{offset:"100%","stop-color":"#a67f2c","stop-opacity":".9"}));
+  vg.appendChild(el("stop",{offset:"46%","stop-color":"#a67f2c","stop-opacity":"0"}));
+  vg.appendChild(el("stop",{offset:"100%","stop-color":"#a67f2c","stop-opacity":"1"}));
   defs.appendChild(vg);
   root.appendChild(defs);
 
+  /* flan */
   const fd=flan(h,99);
   root.appendChild(el("path",{d:fd,fill:"url(#g"+u+")"}));
   root.appendChild(el("path",{d:fd,fill:"#8a6520","fill-opacity":".085",filter:"url(#t"+u+")"}));
   root.appendChild(el("path",{d:fd,fill:"none",stroke:"#6b4d14","stroke-opacity":".45","stroke-width":1.2}));
 
+  /* the die never landed dead centre */
+  const ox=((h>>7)%11-5)*.8, oy=((h>>13)%11-5)*.8;
   const g=el("g",{"class":"design"});
+  const die=el("g",{transform:"translate("+ox.toFixed(1)+","+oy.toFixed(1)+")"});
+
   if(S==="o"&&portrait){
     const hold=el("g",{"clip-path":"url(#fc"+u+")"});
-    const sz=116*(pzoom/100);
+    const sz=104*(pzoom/100);
     hold.appendChild(el("image",{href:portrait,x:-sz/2+pox,y:-sz/2+poy,width:sz,height:sz,
       preserveAspectRatio:"xMidYMid slice","class":"pic"}));
-    hold.appendChild(el("circle",{r:56,fill:"url(#v"+u+")"}));
-    g.appendChild(hold);
+    hold.appendChild(el("circle",{r:52,fill:"url(#v"+u+")"}));
+    die.appendChild(hold);
   }
+
   const dev=el("g",{filter:"url(#e"+u+")",fill:"none",stroke:GM,"stroke-width":1.6});
-  dev.appendChild(el("circle",{r:88,"stroke-width":1.8}));
-  dev.appendChild(el("circle",{r:60,"stroke-width":1.2}));
-  for(let i=0;i<64;i++){const a=i/64*6.283;
-    dev.appendChild(el("circle",{cx:(Math.cos(a)*94).toFixed(2),cy:(Math.sin(a)*94).toFixed(2),
+  for(let i=0;i<72;i++){const a=i/72*6.283;
+    dev.appendChild(el("circle",{cx:(Math.cos(a)*88).toFixed(2),cy:(Math.sin(a)*88).toFixed(2),
       r:1.5,fill:GM,stroke:"none"}))}
-  const TXT="#8a6414", ADV=.518, LS=2.2;
-  /* GOTHICC averages .518em per cap — size the legend to fill its arc */
-  const fit=(txt,maxS)=>{
-    const avail=Math.PI*74*.90;
-    return Math.max(11,Math.min(maxS,(avail/Math.max(1,txt.length)-LS)/ADV));
-  };
-  const arc=(pid,txt,maxS)=>{
-    const size=fit(txt,maxS);
-    const t=el("text",{fill:TXT,stroke:TXT,"stroke-width":(size*.062).toFixed(2),
-      "stroke-linejoin":"round","font-size":size.toFixed(1),"letter-spacing":LS,
-      "font-family":COINF,"font-weight":"400",filter:"url(#e"+u+")"});
-    const tp=el("textPath",{startOffset:"50%","text-anchor":"middle"});
-    tp.setAttribute("href","#"+pid+u); tp.textContent=txt; t.appendChild(tp); dev.appendChild(t)};
-  arc("tp",(S==="o"?(name||"UNSTRUCK").toUpperCase():"VICTORIA").slice(0,16),29);
-  arc("bp",S==="o"?YEAR:"CONOB",25);
+  die.appendChild(dev);
+
+  /* one continuous legend, clockwise, centred at the top */
+  const legend = S==="o"
+    ? ("D N "+romanize(name||"ANONYMVS")+" P F AVG")
+    : REVLEG[h%REVLEG.length];
+  const avail=2*Math.PI*LEGR*.86;
+  const size=Math.max(9,Math.min(21,(avail/Math.max(1,legend.length)-LS)/ADV));
+  const t=el("text",{fill:TXT,stroke:TXT,"stroke-width":(size*.062).toFixed(2),
+    "stroke-linejoin":"round","font-size":size.toFixed(1),"letter-spacing":LS,
+    "font-family":COINF,"font-weight":"400",filter:"url(#e"+u+")"});
+  const tp=el("textPath",{startOffset:"50%","text-anchor":"middle"});
+  tp.setAttribute("href","#lg"+u); tp.textContent=legend;
+  t.appendChild(tp); die.appendChild(t);
+
   if(S==="o"){
     if(!portrait){
-      const m=el("text",{x:0,y:23,fill:TXT,stroke:TXT,"stroke-width":"4.4","stroke-linejoin":"round",
-        "font-size":78,"text-anchor":"middle","letter-spacing":2,
+      const m=el("text",{x:0,y:20,fill:TXT,stroke:TXT,"stroke-width":"4",
+        "stroke-linejoin":"round","font-size":62,"text-anchor":"middle","letter-spacing":2,
         "font-family":COINF,"font-weight":"400",filter:"url(#e"+u+")"});
-      m.textContent=initials(name); dev.appendChild(m);
-      dev.appendChild(el("path",{d:"M -28 40 L 28 40","stroke-width":1.6}));
+      m.textContent=romanize(initials(name)); die.appendChild(m);
     }
   }else{
-    const steps=3+(h%2), sw=13+((h>>4)%5), cr=el("g",{});
-    cr.appendChild(el("path",{d:"M 0 -46 L 0 6","stroke-width":4.2}));
-    cr.appendChild(el("path",{d:"M -17 -30 L 17 -30","stroke-width":4.2}));
-    cr.appendChild(el("path",{d:"M -22 -36 L -22 -24 M 22 -36 L 22 -24","stroke-width":3}));
-    cr.appendChild(el("path",{d:"M -6 -52 L 6 -52","stroke-width":3}));
-    for(let i=0;i<steps;i++){const w=sw+i*11,y=10+i*10;
-      cr.appendChild(el("path",{d:"M "+(-w)+" "+y+" L "+w+" "+y,"stroke-width":6,"stroke-linecap":"butt"}))}
-    dev.appendChild(cr);
+    /* votive wreath, ground line, exergue */
+    const w=wreath(GM,34,-10);
+    w.setAttribute("filter","url(#e"+u+")");
+    die.appendChild(w);
+    const vot=el("text",{x:0,y:-16,fill:TXT,stroke:TXT,"stroke-width":"1.5",
+      "stroke-linejoin":"round","font-size":20,"text-anchor":"middle","letter-spacing":1.6,
+      "font-family":COINF,"font-weight":"400",filter:"url(#e"+u+")"});
+    vot.textContent="VOT"; die.appendChild(vot);
+    const yr=el("text",{x:0,y:8,fill:TXT,stroke:TXT,"stroke-width":"1.4",
+      "stroke-linejoin":"round","font-size":18,"text-anchor":"middle","letter-spacing":1.4,
+      "font-family":COINF,"font-weight":"400",filter:"url(#e"+u+")"});
+    yr.textContent=YEAR; die.appendChild(yr);
+    die.appendChild(el("rect",{x:-42,y:43,width:84,height:2.2,fill:GM,stroke:"none",
+      filter:"url(#e"+u+")"}));
+    const ex=el("text",{x:0,y:60,fill:TXT,stroke:TXT,"stroke-width":"1.1",
+      "stroke-linejoin":"round","font-size":15,"text-anchor":"middle","letter-spacing":1.6,
+      "font-family":COINF,"font-weight":"400",filter:"url(#e"+u+")"});
+    ex.textContent=MINTS[h%MINTS.length]+OFFICINA[(h>>5)%OFFICINA.length];
+    die.appendChild(ex);
   }
-  g.appendChild(dev); root.appendChild(g);
+  g.appendChild(die); root.appendChild(g);
 }
 
 /* ---------------- photo -> a face simple enough to strike ----------------
@@ -374,7 +441,7 @@ function loadPic(f){
   fr.onload=()=>{const im=new Image();
     im.onload=()=>{portrait=toRelief(im);pox=poy=0;pzoom=+$("#zoom").value;
       $("#pctl").classList.add("on");$("#droptxt").textContent="Replace picture";
-      face="o";relief=0;render()};
+      face="o";relief=0;render();if(shown)layDown()};
     im.src=fr.result};
   fr.readAsDataURL(f)}
 
@@ -395,7 +462,7 @@ function applyRelief(){
 }
 function nudge(){
   const im=coinG.querySelector(".pic"); if(!im)return;
-  const sz=116*(pzoom/100);
+  const sz=104*(pzoom/100);
   im.setAttribute("x",-sz/2+pox);im.setAttribute("y",-sz/2+poy);
   im.setAttribute("width",sz);im.setAttribute("height",sz)}
 
@@ -441,15 +508,34 @@ function impact(f){
   clink(f);
   diagram.classList.remove("shake");void diagram.offsetWidth;diagram.classList.add("shake");
   /* the punch drives down onto the blank; the blank flattens under it */
-  punch.style.transform="translateY(26px)";
-  coinG.style.transform="translate(300px,372px) scale(0.86,0.79)";
+  punch.style.transform="translateY(22px)";
+  if(!shown) coinG.style.transform=HIT;
   sparks.classList.remove("go");void sparks.offsetWidth;sparks.classList.add("go");
   relief=Math.min(1,relief+(.16+f*.46));
   applyRelief();
   setTimeout(()=>{
     hammer.classList.remove("slam");hammer.style.transform="translateY(0) rotate(0deg)";
-    punch.style.transform="";coinG.style.transform="";
-    forceBar.style.width="0";ftxt.textContent="—";busy=false},240)}
+    punch.style.transform="";
+    if(!shown) coinG.style.transform=LAID;
+    forceBar.style.width="0";ftxt.textContent="—";busy=false;
+    if(relief>=1&&!shown) setTimeout(reveal,320);
+  },240)}
+
+/* struck through — lift the coin off the die and turn it to the viewer */
+function reveal(){
+  shown=true;
+  diagram.classList.add("revealed");
+  coinG.classList.add("rise");
+  coinG.style.transform=UP;
+  setTimeout(()=>coinG.classList.remove("rise"),1000);
+}
+function layDown(){
+  shown=false;
+  diagram.classList.remove("revealed");
+  coinG.classList.add("rise");
+  coinG.style.transform=LAID;
+  setTimeout(()=>coinG.classList.remove("rise"),1000);
+}
 
 function cancelCharge(){
   if(!charging)return;
@@ -461,7 +547,7 @@ function cancelCharge(){
    move and it becomes a drag that reframes the picture on the blank. */
 let onCoin=false,dragging=false,dsx=0,dsy=0,dox=0,doy=0;
 diagram.addEventListener("pointerdown",e=>{
-  onCoin=!!(portrait&&e.target.closest&&e.target.closest("#coinG"));
+  onCoin=!!(shown&&portrait&&e.target.closest&&e.target.closest("#coinG"));
   dragging=false;dsx=e.clientX;dsy=e.clientY;dox=pox;doy=poy;
   if(onCoin){try{diagram.setPointerCapture(e.pointerId)}catch(_){}}
   startCharge(e)});
@@ -494,14 +580,15 @@ $("#rmpic").addEventListener("click",e=>{e.preventDefault();portrait=null;pox=po
   relief=0;render()});
 
 /* ---------------- controls ---------------- */
-nameEl.addEventListener("input",()=>{relief=0;render()});
+nameEl.addEventListener("input",()=>{relief=0;render();if(shown)layDown()});
 $("#flip").onclick=()=>{
+  if(!shown){face=face==="o"?"r":"o";render();return}
   coinG.classList.add("flip");
-  coinG.style.transform="translate(300px,372px) scale(0.02,0.86)";
+  coinG.style.transform="translate(300px,300px) scale(0.02,0.86)";
   setTimeout(()=>{face=face==="o"?"r":"o";render();
-    coinG.style.transform="translate(300px,372px) scale(0.86)";
+    coinG.style.transform=UP;
     setTimeout(()=>coinG.classList.remove("flip"),300)},290)};
-$("#again").onclick=()=>{relief=0;face="o";render()};
+$("#again").onclick=()=>{relief=0;face="o";render();layDown()};
 $("#dl").onclick=()=>{
   const tmp=document.createElementNS(NS,"svg");
   tmp.setAttribute("xmlns",NS);tmp.setAttribute("viewBox","-110 -110 220 220");
