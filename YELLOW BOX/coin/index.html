@@ -137,10 +137,10 @@ input[type=text]::placeholder{color:#000;opacity:.35}
   </g>
 
   <g id="punch">
-    <path class="solid" d="M267 102 A33 9 0 0 1 333 102 L333 356 A33 9 0 0 1 267 356 Z"/>
+    <path class="solid" d="M267 102 A33 9 0 0 1 333 102 L333 338 A33 9 0 0 1 267 338 Z"/>
     <path class="solid" d="M188 200 L268 207 L268 227 L188 220 Z"/>
     <path class="solid" d="M332 207 L412 200 L412 220 L332 227 Z"/>
-    <path class="seam" d="M268 324 L332 324"/>
+    <path class="seam" d="M268 306 L332 306"/>
   </g>
 
   <!-- obverse die, seated in the anvil -->
@@ -148,7 +148,7 @@ input[type=text]::placeholder{color:#000;opacity:.35}
   <path class="solid" d="M170 442 L430 442 L396 464 L396 560 L412 576 L188 576 L204 560 L204 464 Z"/>
 
   <!-- the blank: lying flat on the die until it has been struck -->
-  <g id="coinG" transform="translate(300,378) scale(0.86,0.15)"></g>
+  <g id="coinG" transform="translate(300,368) scale(0.86)"></g>
 
   <g id="labels">
     <g id="mlabels">
@@ -156,11 +156,11 @@ input[type=text]::placeholder{color:#000;opacity:.35}
       <path class="lead" d="M184 48 L252 48"/><circle class="tick" cx="252" cy="48" r="1.9"/>
       <text class="lab" x="430" y="150" text-anchor="start">Punch</text>
       <path class="lead" d="M422 146 L333 146"/><circle class="tick" cx="333" cy="146" r="1.9"/>
-      <text class="lab" x="430" y="340" text-anchor="start">Reverse die</text>
-      <path class="lead" d="M422 336 L333 336"/><circle class="tick" cx="333" cy="336" r="1.9"/>
+      <text class="lab" x="430" y="322" text-anchor="start">Reverse die</text>
+      <path class="lead" d="M422 318 L333 318"/><circle class="tick" cx="333" cy="318" r="1.9"/>
     </g>
-    <text class="lab" x="176" y="378" text-anchor="end">Coin blank</text>
-    <path class="lead" d="M184 374 L226 376"/><circle class="tick" cx="226" cy="376" r="1.9"/>
+    <text class="lab" x="176" y="368" text-anchor="end">Coin blank</text>
+    <path class="lead" d="M184 364 L222 366"/><circle class="tick" cx="222" cy="366" r="1.9"/>
     <text class="lab" x="430" y="404" text-anchor="start">Obverse die</text>
     <path class="lead" d="M422 400 L392 400"/><circle class="tick" cx="392" cy="400" r="1.9"/>
     <text class="lab" x="176" y="518" text-anchor="end">Anvil</text>
@@ -212,9 +212,9 @@ function initials(n){const w=(n||"").trim().split(/\s+/).filter(Boolean);
  return (w[0][0]+w[w.length-1][0]).toUpperCase()}
 
 let relief=0,charge=0,charging=false,raf=0,t0=0,busy=false,face="o",shown=false;
-const LAID="translate(300px,378px) scale(0.86,0.15)",
-      HIT ="translate(300px,378px) scale(0.86,0.09)",
-      UP  ="translate(300px,300px) scale(0.86,0.86)";
+const LAID="translate(300px,368px) scale(0.86)",
+      HIT ="translate(300px,373px) scale(0.86,0.66)",
+      UP  ="translate(300px,296px) scale(0.86)";
 let portrait=null,pzoom=128,pox=0,poy=0;
 const COINF="GOTHICC,Helvetica Neue,Helvetica,Arial,sans-serif";
 
@@ -280,6 +280,33 @@ function wreath(col,R,cy){
   g.appendChild(el("path",{d:"M -7 "+(R-2)+" Q 0 "+(R+6)+" 7 "+(R-2),
     fill:"none",stroke:col,"stroke-width":2.2}));
   return g;
+}
+
+/* the blank as it actually sits: a flat top face with real thickness under it,
+   not the struck face squashed — a squashed face reads as a dome */
+function buildBlank(root,h,uid){
+  while(root.firstChild)root.removeChild(root.firstChild);
+  const u=(uid||"b")+"L", SQ=.20, TH=11;
+  const flat=flan(h,99).replace(/(-?[\d.]+),(-?[\d.]+)/g,
+    (m,x,y)=>x+","+(parseFloat(y)*SQ).toFixed(2));
+
+  const defs=el("defs",{});
+  /* top face: lit from above and behind, so it reads as horizontal */
+  const tf=el("linearGradient",{id:"tf"+u,x1:"20%",y1:"0%",x2:"80%",y2:"100%"});
+  [["0%","#f2dc9d"],["45%","#dcbb6a"],["100%","#b98f34"]]
+    .forEach(([o,c])=>tf.appendChild(el("stop",{offset:o,"stop-color":c})));
+  defs.appendChild(tf);
+  /* the edge, turned away from the light */
+  const ef=el("linearGradient",{id:"ef"+u,x1:"0%",y1:"0%",x2:"0%",y2:"100%"});
+  [["0%","#a37a26"],["100%","#6d4f14"]]
+    .forEach(([o,c])=>ef.appendChild(el("stop",{offset:o,"stop-color":c})));
+  defs.appendChild(ef);
+  root.appendChild(defs);
+
+  /* thickness first, then the face over it — the crescent left below is the edge */
+  root.appendChild(el("path",{d:flat,fill:"url(#ef"+u+")",transform:"translate(0,"+TH+")"}));
+  root.appendChild(el("path",{d:flat,fill:"url(#tf"+u+")"}));
+  root.appendChild(el("path",{d:flat,fill:"none",stroke:"#6b4d14","stroke-opacity":".5","stroke-width":1.1}));
 }
 
 function buildCoin(root,name,S,uid){
@@ -449,7 +476,11 @@ function loadPic(f){
 const coinG=$("#coinG"),nameEl=$("#name"),btn=$("#strike"),diagram=$("#diagram"),
       forceBar=$("#force").firstElementChild,reliefBar=$("#relief").firstElementChild,
       ftxt=$("#ftxt"),rtxt=$("#rtxt"),hammer=$("#hammer"),punch=$("#punch"),sparks=$("#sparks");
-function render(){ buildCoin(coinG,nameEl.value,face,"m"); applyRelief(); }
+function render(){
+  if(shown) buildCoin(coinG,nameEl.value,face,"m");
+  else buildBlank(coinG,hash((nameEl.value||"blank").toUpperCase()+"o"),"m");
+  applyRelief();
+}
 function applyRelief(){
   const d=coinG.querySelector(".design");
   if(d){d.setAttribute("opacity",(.10+.90*relief).toFixed(3));
@@ -523,14 +554,14 @@ function impact(f){
 
 /* struck through — lift the coin off the die and turn it to the viewer */
 function reveal(){
-  shown=true;
+  shown=true; render();
   diagram.classList.add("revealed");
   coinG.classList.add("rise");
   coinG.style.transform=UP;
   setTimeout(()=>coinG.classList.remove("rise"),1000);
 }
 function layDown(){
-  shown=false;
+  shown=false; render();
   diagram.classList.remove("revealed");
   coinG.classList.add("rise");
   coinG.style.transform=LAID;
