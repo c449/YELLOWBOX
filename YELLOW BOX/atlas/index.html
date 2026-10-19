@@ -66,6 +66,8 @@ button:focus, button:focus-visible { outline: none; }   /* no frame around a cli
 .pop b { font: 400 var(--big)/1 var(--cecilia); white-space: normal; }
 .pop p { margin: 0; font-size: var(--small); line-height: 1.3; white-space: normal; max-width: 34ch; }
 .pop .row { display: flex; gap: 6px; }
+.pop .wiki { color: var(--ink); font-size: var(--small); text-decoration: underline; text-underline-offset: 3px; }
+.pop .row[hidden] { display: none; }
 
 .btn { border: 0; background: var(--ink); color: var(--bg); padding: 4px 9px; font-size: var(--small); cursor: pointer; }
 .btn.ghost { background: transparent; color: var(--ink); }
@@ -215,7 +217,7 @@ label.f > .jw, label.f > .jw *, .ylab, .ylab * { -webkit-text-stroke: .05em curr
     <div class="tiles" id="tiles"></div>
     <svg id="ov" viewBox="0 0 6749 2200"></svg>
   </div>
-  <div class="pop" id="pop" hidden><b id="popName"></b><p id="popNote"></p><div class="row"><button class="btn" id="popFrom">Walk from here</button><button class="btn" id="popTo">Walk to here</button></div></div>
+  <div class="pop" id="pop" hidden><b id="popName"></b><p id="popNote"></p><p id="popExtract" hidden></p><a id="popWiki" class="wiki" target="_blank" rel="noopener" hidden>Wikipedia</a><div class="row"><button class="btn" id="popFrom">Walk from here</button><button class="btn" id="popTo">Walk to here</button></div></div>
 </div>
 <div class="panel">
   <img class="cross" src="looks/cross.gif" alt="">
@@ -480,11 +482,16 @@ chart.addEventListener('pointermove', e => {
     zoomAt(pinch0.s*Math.hypot(a.x-b.x, a.y-b.y)/pinch0.d/view.s, (a.x+b.x)/2-r.left, (a.y+b.y)/2-r.top); moved += 10; return; }
   moved += Math.abs(dx)+Math.abs(dy); view.tx += dx; view.ty += dy; applyView(); });
 chart.addEventListener('pointermove', e => { if (pts.size) return; const id = nearestMarker(e.clientX, e.clientY);
-  if (id !== hover) { hover = id; chart.style.cursor = id ? 'pointer' : ''; labels(); } });
+  if (id !== hover) { hover = id; labels(); }
+  // a drawing on the atlas opens its card on hover (with a mouse), and closes when the pointer leaves it
+  const d = id ? null : (e.pointerType === 'mouse' ? detailAt(e.clientX, e.clientY) : null);
+  if (d && d !== popDetail && (!popId || popDetail)) openDetail(d);
+  else if (!d && popDetail && e.pointerType === 'mouse' && !e.target.closest('#pop')) closePop();
+  chart.style.cursor = id || d ? 'pointer' : ''; });
 chart.addEventListener('pointerleave', () => { if (hover) { hover = null; labels(); } });
 const endPtr = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; if (!pts.size) chart.classList.remove('dragging'); };
 chart.addEventListener('pointerup', e => { if (!pts.has(e.pointerId)) return; const tapped = moved < 6 && pts.size <= 1; endPtr(e);
-  if (tapped) { const id = nearestMarker(e.clientX, e.clientY); if (id) openPop(id); else closePop(); } downMk = null; });
+  if (tapped) { const id = nearestMarker(e.clientX, e.clientY), d = id ? null : detailAt(e.clientX, e.clientY); if (id) openPop(id); else if (d) openDetail(d); else closePop(); } downMk = null; });
 // the place closest to where you clicked, within a finger's width: markers sit close together in Europe
 function nearestMarker(cx, cy) {
   const r = chart.getBoundingClientRect(); const x = (cx - r.left - view.tx)/view.s, y = (cy - r.top - view.ty)/view.s;
@@ -508,7 +515,7 @@ function addMarker(p) {
   g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPop(p.id); } });
   mkLayer.appendChild(g);
 }
-let hover = null, popId = null;
+let hover = null, popId = null, popDetail = null;
 P.forEach(addMarker);
 // names on the map: always for From and To, for whatever is hovered or clicked, and for the whole route once zoomed in
 function labels() {
@@ -526,14 +533,14 @@ function labels() {
     if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) { lf.setAttribute('x', -20); lf.style.textAnchor = 'end'; } }
 }
 function openPop(id) {
-  popId = id; $('#popName').textContent = byId[id].name; $('#popNote').textContent = NOTES[id] || ''; $('#popNote').hidden = !NOTES[id];
+  popId = id; popDetail = null; $('#pop .row').hidden = false; $('#popWiki').hidden = true; $('#popExtract').hidden = true; $('#popName').textContent = byId[id].name; $('#popNote').textContent = NOTES[id] || ''; $('#popNote').hidden = !NOTES[id];
   $('#popFrom').disabled = state.from === id; $('#popTo').disabled = state.to === id;
   $('#popFrom').classList.toggle('next', !state.from); $('#popTo').classList.toggle('next', !!state.from && !state.to);
   $('#pop').hidden = false; labels(); placePop();
 }
-function closePop() { popId = null; $('#pop').hidden = true; labels(); }
+function closePop() { popId = null; popDetail = null; $('#pop').hidden = true; labels(); }
 function placePop() {
-  if (!popId || !byId[popId]) return; const p = byId[popId], pop = $('#pop');
+  if (!popId) return; const pop = $('#pop'), p = popDetail ? {x: popDetail.mx, y: popDetail.my} : byId[popId]; if (!p) return;
   const x = view.tx + p.x*view.s, y = view.ty + p.y*view.s, w = chart.clientWidth, pw = pop.offsetWidth/2;
   pop.style.left = Math.max(pw + 8, Math.min(w - pw - 8, x)) + 'px'; pop.style.top = y + 'px';
   pop.style.transform = y - pop.offsetHeight - 30 < 0 ? 'translate(-50%, 22px)' : '';
@@ -1296,6 +1303,80 @@ function drawLines() {
   if (tallest) document.documentElement.style.setProperty('--lineH', tallest + 'px');
 }
 window.addEventListener('resize', () => { drawLines(); placeKnob(); });
+
+// ------------------------------------------------------------------ the drawings on the atlas: who or what each one is.
+// x, y, r in pixels of the full scan (11811 x 3850); notes follow the atlas's own captions as transcribed by
+// Buchon and Tastu (1839) and the Sapienza edition, and the Catalan and English Wikipedia articles on the atlas.
+const DETAILS = [
+  {x:480, y:1950, r:190, name:'Compass rose', wiki:'Compass_rose', note:'The first compass rose known on a sea chart. It names the eight winds, with the Pole Star at north.'},
+  {x:995, y:1130, r:70, name:'Brazil', wiki:'Hy_Brasil', note:'A round island west of Ireland that did not exist. It comes from Irish legend.'},
+  {x:700, y:2320, r:260, name:'Canary Islands', wiki:'Canary_Islands', note:'Known to the mapmakers by name. The atlas tells old fables about their riches.'},
+  {x:650, y:3570, r:170, name:'The ship of Jaume Ferrer', wiki:'Jaume_Ferrer', note:'A Majorcan who sailed south for the River of Gold on 10 August 1346.'},
+  {x:2200, y:2860, r:260, name:'Atlas Mountains', wiki:'Atlas_Mountains', note:'The caption says these mountains are full of good towns and castles.'},
+  {x:1760, y:3500, r:230, name:'A veiled rider', wiki:'Sanhaja', note:'The caption: all this land is held by people who veil themselves so only their eyes show. They live in tents and ride camels.'},
+  {x:1995, y:3070, r:100, name:'Sijilmasa', wiki:'Sijilmasa', note:'Caravan city on the road across the Sahara, drawn inside a ring of river.'},
+  {x:2550, y:3440, r:210, name:'Mansa Musa', wiki:'Mansa_Musa', note:'The caption: this black lord is called Musse Melly, lord of the land of Guinea, the richest and noblest lord of the region for the gold of his land.'},
+  {x:3260, y:3550, r:180, name:'A camel and its driver', wiki:'Trans-Saharan_trade', note:'Camels carried the caravans that crossed the Sahara.'},
+  {x:3650, y:3600, r:210, name:'King of Organa', wiki:'Kanem%E2%80%93Bornu_Empire', note:'The caption: here rules the king of Organa, a Saracen, always at war with the Saracens of the coast. No kingdom had this name. Most often read as Kanem.'},
+  {x:4000, y:3610, r:150, name:'An elephant', wiki:'African_elephant', note:'An elephant carrying a tower, in the land south of the Sahara.'},
+  {x:4300, y:3560, r:210, name:'King of Nubia', wiki:'Makuria', note:'The caption: a king of Nubia, always at war with the Christians of Nubia, who are subjects of Prester John.'},
+  {x:4950, y:2950, r:210, name:'Sultan of Babylon', wiki:'Mamluk_Sultanate', note:'The sultan of Egypt, then called Babylon. In 1375 the Mamluk sultan is al-Ashraf Shaban.'},
+  {x:5550, y:3100, r:260, name:'Red Sea', wiki:'Red_Sea', note:'The caption: the twelve tribes of Israel crossed here. The water is not red; the bottom is.'},
+  {x:5560, y:2430, r:110, name:'Jerusalem', wiki:'Jerusalem', note:'Drawn as a church, not as a city like the others.'},
+  {x:5620, y:2800, r:100, name:'Saint Catherine’s Monastery', wiki:'Saint_Catherine%27s_Monastery', note:'On Mount Sinai. The caption: here lies the body of Saint Catherine the virgin.'},
+  {x:5250, y:1540, r:160, name:'Turkey', wiki:'Anatolian_beyliks', note:'The caption: Asia Minor, also called Turkey, with many cities and castles.'},
+  {x:5300, y:1860, r:130, name:'Armenia', wiki:'Armenian_Kingdom_of_Cilicia', note:'The Christian kingdom of Cilician Armenia, inside green walls.'},
+  {x:6370, y:270, r:230, name:'Jani Beg', wiki:'Jani_Beg', note:'The caption: here lives the emperor of the north, whose empire runs from Bulgaria to Urgench. He is called Jambech, lord of Sarai.'},
+  {x:6600, y:1240, r:190, name:'Noah’s Ark', wiki:'Noah%27s_Ark', note:'The atlas shows the ark resting on Mount Ararat.'},
+  {x:6060, y:2470, r:110, name:'Tower of Babel', wiki:'Tower_of_Babel', note:'Drawn near Baghdad, which the atlas calls the old Babylon.'},
+  {x:6750, y:2100, r:210, name:'King of Tabriz', wiki:'Ilkhanate', note:'The Mongol ruler of Persia, named after his capital Tabriz.'},
+  {x:6420, y:2790, r:220, name:'Pearl fishing', wiki:'Pearl_hunting', note:'The caption: at the mouth of the river of Baghdad pearls are fished and taken to the city.'},
+  {x:6190, y:3440, r:120, name:'A pilgrim at Mecca', wiki:'Mecca', note:'The caption says pilgrims who see the tomb of Muhammad blind themselves, wanting to see nothing more.'},
+  {x:6760, y:3500, r:210, name:'Queen of Sheba', wiki:'Queen_of_Sheba', note:'The caption: Arabia of Sheba, rich in myrrh and incense, gold, silver and precious stones.'},
+  {x:7700, y:500, r:310, name:'The caravan to Cathay', wiki:'Silk_Road', note:'Merchants leave for China. The caption: they rest a week in the city of Lop, then carry food for seven months across the desert.'},
+  {x:8250, y:520, r:260, name:'The caravan to Cathay', wiki:'Silk_Road', note:'Merchants leave for China. The caption: they rest a week in the city of Lop, then carry food for seven months across the desert.'},
+  {x:8000, y:1990, r:230, name:'The Three Kings', wiki:'Biblical_Magi', note:'The caption: from this province of Tarsia came the three wise kings who went to Bethlehem. They are buried in Cologne.'},
+  {x:7700, y:2300, r:210, name:'Sultan of Delhi', wiki:'Delhi_Sultanate', note:'The caption: a great sultan with seven hundred elephants and a hundred thousand horsemen.'},
+  {x:8360, y:2450, r:170, name:'An elephant', wiki:'War_elephant', note:'An elephant and its driver, beside the sultan of Delhi.'},
+  {x:7660, y:3170, r:190, name:'A junk', wiki:'Junk_(ship)', note:'The caption: these ships are called junks. They have four to ten masts, and sails of cane and palm.'},
+  {x:7560, y:3460, r:160, name:'Pearl divers', wiki:'Pearl_hunting', note:'The caption: before diving, the fishers say charms that drive the fish away.'},
+  {x:8550, y:3400, r:210, name:'King of Kollam', wiki:'Kollam', note:'The caption: here rules the king of Colombo, a Christian. This is Kollam in south India, not Colombo in Sri Lanka.'},
+  {x:9220, y:780, r:260, name:'A cremation', wiki:'Sati_(practice)', note:'The caption: the dead are burned with music. Wives sometimes throw themselves into the fire with their husbands.'},
+  {x:9440, y:1450, r:180, name:'The valley of diamonds', wiki:'Marco_Polo', note:'Men throw meat into a valley of diamonds; birds carry it out with the stones stuck to it. A tale also told by Marco Polo.'},
+  {x:9950, y:400, r:260, name:'Gog and Magog', wiki:'Gog_and_Magog', note:'A king on horseback under a canopy. The caption: he will come with many people in the time of the Antichrist.'},
+  {x:9100, y:2060, r:210, name:'Kebek', wiki:'Kebek', note:'The caption: here reigns King Chabech, lord of the empire of Media. He lives at Almaliq.'},
+  {x:9120, y:2790, r:220, name:'The tomb of Saint Thomas', wiki:'Thomas_the_Apostle', note:'A king beside the caption saying the body of Saint Thomas the Apostle lies in this land.'},
+  {x:9800, y:2060, r:260, name:'Pygmies and cranes', wiki:'Pygmy_(Greek_mythology)', note:'The caption: small men who fight off the cranes, catch them and eat them.'},
+  {x:9450, y:3330, r:160, name:'Queen of Java', wiki:'Java', note:'Labeled Iana, a miscopy of Iaua. The caption lists aloe, camphor, sandalwood, nutmeg and cinnamon.'},
+  {x:9050, y:3400, r:200, name:'A Javanese ship', wiki:'Djong', note:'A large ship of the islands, sailing near Java.'},
+  {x:10750, y:1050, r:350, name:'Antichrist', wiki:'Antichrist', note:'The caption: he will be raised in Galilee and at thirty will preach in Jerusalem, saying he is Christ.'},
+  {x:10460, y:1420, r:160, name:'Alexander and Satan', wiki:'Alexander_the_Great', note:'The caption: in the Caspian mountains Satan saved Alexander, who then shut away Gog and Magog.'},
+  {x:10500, y:1730, r:210, name:'Kublai Khan', wiki:'Kublai_Khan', note:'The caption: the greatest prince of the Tartars, Holubeim, which means Great Khan, richer than any emperor in the world.'},
+  {x:11400, y:2520, r:210, name:'Naked islanders', wiki:'Catalan_Atlas', note:'People of the eastern islands, shown in the sea among fish.'},
+  {x:10900, y:2960, r:320, name:'The 7,548 islands', wiki:'Catalan_Atlas', note:'The caption: the sea of the Indies has 7,548 islands, too rich in wonders, gold and stones to describe.'},
+  {x:10560, y:3540, r:170, name:'A siren', wiki:'Siren_(mythology)', note:'Half woman, half fish, holding a fish. Sirens in the Indian Ocean come from Marco Polo.'},
+  {x:11400, y:3450, r:230, name:'Taprobana', wiki:'Taprobana', note:'A black king, with an elephant carrying a tower. The caption: the last island of the Indies, with giants who eat strangers. Probably Sumatra or Sri Lanka.'},
+];
+const SCAN_K = 6749 / 11811;   // scan pixels to map units
+DETAILS.forEach(d => { d.mx = d.x*SCAN_K; d.my = d.y*SCAN_K; d.mr = d.r*SCAN_K; });
+function detailAt(cx, cy) {
+  const r = chart.getBoundingClientRect(), x = (cx - r.left - view.tx)/view.s, y = (cy - r.top - view.ty)/view.s;
+  let best = null, bd = Infinity;
+  DETAILS.forEach(d => { const dd = Math.hypot(d.mx - x, d.my - y); if (dd < d.mr && dd < bd) { bd = dd; best = d; } });
+  return best;
+}
+const wikiCache = {};
+function openDetail(d) {
+  popId = 'detail'; popDetail = d;
+  $('#popName').textContent = d.name; $('#popNote').textContent = d.note; $('#popNote').hidden = false;
+  $('#pop .row').hidden = true; $('#popWiki').hidden = false; $('#popWiki').href = 'https://en.wikipedia.org/wiki/' + d.wiki;
+  $('#popExtract').hidden = true;
+  const show = t => { if (popDetail === d && t) { $('#popExtract').textContent = t; $('#popExtract').hidden = false; placePop(); } };
+  if (wikiCache[d.wiki] !== undefined) show(wikiCache[d.wiki]);
+  else fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + d.wiki).then(r => r.ok ? r.json() : null)
+    .then(j => { const t = j && j.extract ? j.extract.split(/(?<=\.)\s/).slice(0, 2).join(' ') : ''; wikiCache[d.wiki] = t; show(t); }).catch(() => {});
+  $('#pop').hidden = false; labels(); placePop();
+}
 
 // ------------------------------------------------------------------ result
 let current = null, stops = [];
