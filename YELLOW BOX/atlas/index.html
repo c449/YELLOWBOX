@@ -62,7 +62,7 @@ button:focus, button:focus-visible { outline: none; }   /* no frame around a cli
 .route { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-linejoin: round; }
 
 /* what you clicked on the map */
-.pop { width: max-content; max-width: 300px; position: absolute; z-index: 5; transform: translate(-50%, calc(-100% - 22px)); background: var(--bg); padding: 10px 12px; display: grid; gap: 8px; justify-items: start; white-space: nowrap; }
+.pop { width: max-content; max-width: 340px; position: fixed; z-index: 20; transform: none; max-height: calc(100vh - 16px); overflow: auto; background: var(--bg); padding: 10px 12px; display: grid; gap: 8px; justify-items: start; white-space: nowrap; }
 .pop b { font: 400 var(--big)/1 var(--cecilia); white-space: normal; }
 .pop p { margin: 0; font-size: var(--small); line-height: 1.3; white-space: normal; max-width: 34ch; }
 .pop .row { display: flex; gap: 6px; }
@@ -540,11 +540,16 @@ function openPop(id) {
 }
 function closePop() { popId = null; popDetail = null; $('#pop').hidden = true; labels(); }
 function placePop() {
+  // the card is placed on the screen, not inside the map, so it is never cut off by the map's edge:
+  // above the drawing if it fits there, otherwise below it, otherwise wherever it fits best
   if (!popId) return; const pop = $('#pop'), p = popDetail ? {x: popDetail.mx, y: popDetail.my} : byId[popId]; if (!p) return;
-  const x = view.tx + p.x*view.s, y = view.ty + p.y*view.s, w = chart.clientWidth, pw = pop.offsetWidth/2;
-  pop.style.left = Math.max(pw + 8, Math.min(w - pw - 8, x)) + 'px'; pop.style.top = y + 'px';
-  pop.style.transform = y - pop.offsetHeight - 30 < 0 ? 'translate(-50%, 22px)' : '';
+  if (matchMedia('(max-width: 860px)').matches) return;   // phones: the card is a strip along the bottom
+  const cr = chart.getBoundingClientRect(), x = cr.left + view.tx + p.x*view.s, y = cr.top + view.ty + p.y*view.s;
+  const pw = pop.offsetWidth, ph = pop.offsetHeight, gap = 22, vw = innerWidth, vh = innerHeight;
+  let top = y - ph - gap; if (top < 8) top = y + gap; if (top + ph > vh - 8) top = Math.max(8, vh - 8 - ph);
+  pop.style.left = Math.max(8, Math.min(vw - pw - 8, x - pw/2)) + 'px'; pop.style.top = top + 'px'; pop.style.transform = 'none';
 }
+
 function choose(k, id) { state[k] = id; closePop(); pruneToday(); stopWalk(); render(); }
 $('#popFrom').onclick = () => choose('from', popId);
 $('#popTo').onclick = () => choose('to', popId);
@@ -1303,6 +1308,7 @@ function drawLines() {
   if (tallest) document.documentElement.style.setProperty('--lineH', tallest + 'px');
 }
 window.addEventListener('resize', () => { drawLines(); placeKnob(); });
+window.addEventListener('scroll', () => placePop(), {passive: true});
 
 // ------------------------------------------------------------------ the drawings on the atlas: who or what each one is.
 // x, y, r in pixels of the full scan (11811 x 3850); notes follow the atlas's own captions as transcribed by
