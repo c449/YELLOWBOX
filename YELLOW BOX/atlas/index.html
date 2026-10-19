@@ -45,7 +45,7 @@ button:focus-visible, input:focus-visible, .mk:focus-visible { outline: 2px soli
 /* on a phone the map shows three of its eight panels at a time, full height, from the west; swipe for the rest */
 @media (max-width: 860px) { .chart { aspect-ratio: 2531 / 2200; } }
 .chart.dragging { cursor: grabbing; }
-.stage { position: absolute; left: 0; top: 0; width: 6749px; height: 2200px; transform-origin: 0 0; will-change: transform; }
+.stage { position: absolute; left: 0; top: 0; width: 6749px; height: 2200px; transform-origin: 0 0; }   /* no will-change: a held layer of this size shows white while the browser redraws it at a new zoom */
 .stage img.base { display: block; width: 6749px; height: 2200px; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
 .tiles { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .tiles img { position: absolute; display: block; max-width: none; user-select: none; -webkit-user-drag: none; }
@@ -455,7 +455,7 @@ function loadTiles() {
         const im = new Image(); im.decoding = 'async'; im.alt = '';
         im.style.left = tx*T + 'px'; im.style.top = ty*T + 'px';
         im.style.width = Math.min(512, L.w - tx*512)*k + 'px'; im.style.height = Math.min(512, L.h - ty*512)*k + 'px';
-        im.style.zIndex = lv; im.style.opacity = 0; im.onload = () => { im.style.opacity = 1; };
+        im.style.zIndex = lv; im.style.visibility = 'hidden'; im.onload = () => { im.style.visibility = ''; };   // a tile appears only once it has loaded; the scan under it stays visible
         im.src = `tiles/${key}.jpg`; tileEls[key] = im; $('#tiles').appendChild(im);
       } });
 }
