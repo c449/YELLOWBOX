@@ -1,5 +1,5 @@
 # Netlify was cancelling builds with "no changes detected in base directory"
 # (the site folder's name has a space). Always build on every push.
+# The base and publish folder ("YELLOW BOX") stay as set in Netlify's settings.
 [build]
-  publish = "YELLOW BOX"
   ignore = "exit 1"
