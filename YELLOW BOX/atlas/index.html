@@ -90,7 +90,7 @@ label.f.bad input { color: var(--bad); }
 .year .ylab { font-size: 1.25rem; line-height: 1; }
 .year output { order: 1; }
 .year .track { order: 2; position: relative; display: block; }
-.year .knob { position: absolute; top: calc(4px + var(--own, var(--lineH)) * var(--f, .5) - .5px); transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; z-index: 2; }
+.year .knob { position: absolute; top: calc(4px + var(--own, var(--lineH)) * var(--f, .5) - .5px - .18em);   /* arms above the line, the foot through it */ transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; z-index: 2; }
 .year input { display: block; margin-top: -14px !important; width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; height: var(--lineH); background: transparent no-repeat left top / 100% auto; margin: 0; }
 /* the handle is the dagger from Cecilia; the real handle is invisible under it */
 .year input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 34px; height: 60px; background: none; border: 0; box-shadow: none; opacity: 0; cursor: pointer; }   /* iPhone would otherwise paint a white box */
@@ -149,7 +149,6 @@ label.f input { caret-color: var(--ink); font-feature-settings: normal; font-ker
 .result #stop { display: inline-block; } .result #whyBtn { display: block; }
 /* in the result only WHY stays: no WALK; closed, WHY lines up with the sentence; open, it sits centred in its box */
 .result #go, .result #stop { display: none !important; }
-.result #whyBtn[aria-expanded="false"] .word { justify-content: flex-start; }
 .result .whytext:not([hidden]) { display: grid; }
 .result .panel { grid-template-columns: 96px minmax(0, 1fr); grid-template-areas: "cross sent" "cross act" "cross why"; row-gap: 22px; align-items: start; }
 body:not(.result) .trail { display: none; }
@@ -164,8 +163,8 @@ body:not(.result) .trail { display: none; }
 .btn.box .word { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; padding-top: .14em; color: var(--ink); }
 /* the box only shows while the button is on: ROADS drawn, ABOUT open */
 .btn.box img { visibility: hidden; }
-#roadsBtn[aria-pressed="true"] img, #aboutBtn[aria-expanded="true"] img, #whyBtn[aria-expanded="true"] img { visibility: visible; }
-#roadsBtn[aria-pressed="true"] .word, #aboutBtn[aria-expanded="true"] .word, #whyBtn[aria-expanded="true"] .word { color: var(--bg); }
+#roadsBtn[aria-pressed="true"] img, #aboutBtn[aria-expanded="true"] img, #whyBtn img { visibility: visible; }   /* WHY always wears its box, like WALK */
+#roadsBtn[aria-pressed="true"] .word, #aboutBtn[aria-expanded="true"] .word, #whyBtn .word { color: var(--bg); }
 #aboutBtn img { transform: scale(-1, -1); }
 /* without its box, a word lines up on the left like the rest of the text */
 #roadsBtn[aria-pressed="false"] .word, #aboutBtn[aria-expanded="false"] .word { justify-content: flex-start; }
