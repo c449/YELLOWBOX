@@ -84,14 +84,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outli
 .from { grid-area: from; } .to { grid-area: to; } .year { grid-area: year; } .actions { grid-area: act; }
 .days { grid-area: days; } .km { grid-area: km; } .alive { grid-area: alive; } .whytext { grid-area: why; }
 label.f { display: grid; gap: 8px; font-size: 1.25rem; line-height: 1; }
-label.f input { width: 100%; box-sizing: border-box; border: 0; border-radius: 0; background: transparent no-repeat left bottom / 100% auto; padding: 0 0 calc(2px + var(--lineH)); margin: 0; line-height: 1.1; font-size: var(--big); }
+label.f input { width: 100%; box-sizing: border-box; border: 0; border-radius: 0; background: transparent no-repeat 0 0 / 100% auto; padding: 0 0 calc(var(--lineH) - 6px); margin: 0; line-height: 1.1; font-size: var(--big); }   /* each drawn line starts just under the name */
 label.f.bad input { color: var(--bad); }
 .year { display: grid; gap: 8px; }   /* built like the fields: word, big value, the line under it */
 .year .ylab { font-size: 1.25rem; line-height: 1; }
 .year output { order: 1; }
 .year .track { order: 2; position: relative; display: block; }
-.year .knob { position: absolute; top: calc(4px + var(--lineH) - var(--own, var(--lineH)) + var(--own, var(--lineH)) * var(--f, .5) - .5px); transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; z-index: 2; }
-.year input { display: block; margin-top: -6px !important; width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; height: var(--lineH); background: transparent no-repeat left bottom / 100% auto; margin: 0; }
+.year .knob { position: absolute; top: calc(4px + var(--own, var(--lineH)) * var(--f, .5) - .5px); transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; z-index: 2; }
+.year input { display: block; margin-top: -14px !important; width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; height: var(--lineH); background: transparent no-repeat left top / 100% auto; margin: 0; }
 /* the handle is the dagger from Cecilia; the real handle is invisible under it */
 .year input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 34px; height: 60px; background: none; border: 0; box-shadow: none; opacity: 0; cursor: pointer; }   /* iPhone would otherwise paint a white box */
 .year input::-moz-range-thumb { width: 34px; height: 60px; background: none; border: 0; box-shadow: none; opacity: 0; cursor: pointer; }
@@ -1289,6 +1289,7 @@ function drawLines() {
   let tallest = 0;
   Object.entries(LINES).forEach(([id, [src, w, h]]) => { const el = document.getElementById(id), cw = el.clientWidth; if (!cw) return;
     el.style.backgroundImage = `url("${src}")`; const own = cw * h / w; tallest = Math.max(tallest, own);
+    if (id !== 'year') el.style.backgroundPosition = `0 ${parseFloat(getComputedStyle(el).lineHeight) - 6}px`;   // the line starts 6px above the bottom of the name's line box
     if (id === 'year') document.querySelector('.year').style.setProperty('--own', own + 'px'); });
   if (tallest) document.documentElement.style.setProperty('--lineH', tallest + 'px');
 }
