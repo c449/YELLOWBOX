@@ -90,7 +90,7 @@ label.f.bad input { color: var(--bad); }
 .year .ylab { font-size: 1.25rem; line-height: 1; }
 .year output { order: 1; }
 .year .track { order: 2; position: relative; display: block; }
-.year .knob { position: absolute; top: calc(4px + var(--lineH) - var(--own, var(--lineH)) / 2 - .5px); transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; z-index: 2; }
+.year .knob { position: absolute; top: calc(4px + var(--lineH) - var(--own, var(--lineH)) + var(--own, var(--lineH)) * var(--f, .5) - .5px); transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; z-index: 2; }
 .year input { display: block; margin-top: -6px !important; width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; height: var(--lineH); background: transparent no-repeat left bottom / 100% auto; margin: 0; }
 /* the handle is the dagger from Cecilia; the real handle is invisible under it */
 .year input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 34px; height: 60px; background: none; border: 0; box-shadow: none; opacity: 0; cursor: pointer; }   /* iPhone would otherwise paint a white box */
@@ -1292,13 +1292,21 @@ function drawLines() {
     if (id === 'year') document.querySelector('.year').style.setProperty('--own', own + 'px'); });
   if (tallest) document.documentElement.style.setProperty('--lineH', tallest + 'px');
 }
-window.addEventListener('resize', drawLines);
+window.addEventListener('resize', () => { drawLines(); placeKnob(); });
 
 // ------------------------------------------------------------------ result
 let current = null, stops = [];
 const fmt = n => Math.round(n).toLocaleString('en');
 const esc = t => t.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function placeKnob() { const el = $('#year'), t = (el.value - el.min)/(el.max - el.min); $('#knob').style.left = `calc(17px + ${t} * (100% - 34px))`; }
+// how high the drawn year line runs along its length (as a share of the image's height, ends measured inside the serifs),
+// so the dagger stands on the line wherever it is
+const YEAR_LINE = [0.331, 0.331, 0.331, 0.331, 0.343, 0.349, 0.355, 0.355, 0.355, 0.355, 0.343, 0.331, 0.314, 0.285, 0.256, 0.233, 0.203, 0.186, 0.192, 0.192, 0.192, 0.203, 0.215, 0.238, 0.25, 0.273, 0.297, 0.314, 0.331, 0.343, 0.36, 0.384, 0.413, 0.442, 0.483, 0.523, 0.558, 0.587, 0.599, 0.599, 0.599];
+function placeKnob() {
+  const el = $('#year'), t = (el.value - el.min)/(el.max - el.min), w = el.clientWidth || 1;
+  $('#knob').style.left = `calc(17px + ${t} * (100% - 34px))`;
+  const fx = Math.min(1, Math.max(0, ((17 + t*(w - 34))/w - 0.006) / 0.986)) * (YEAR_LINE.length - 1), i = Math.floor(fx), k = fx - i;
+  $('#knob').style.setProperty('--f', YEAR_LINE[i] + (YEAR_LINE[Math.min(i + 1, YEAR_LINE.length - 1)] - YEAR_LINE[i]) * k);
+}
 // the text cursor waits in the field to fill next (on a computer; on a phone it would open the keyboard)
 let lastFrom = null;
 function caretNext() {
