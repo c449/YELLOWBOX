@@ -82,11 +82,13 @@ label.f.bad input { color: var(--bad); }
 .year .ylab { font-size: 1.25rem; line-height: 1; }
 .year output { order: 1; }
 .year .track { order: 2; position: relative; display: block; }
-.year .knob { position: absolute; top: calc(4px + var(--lineH) - var(--own, var(--lineH)) / 2 - .5px); transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; }
+.year .knob { position: absolute; top: calc(4px + var(--lineH) - var(--own, var(--lineH)) / 2 - .5px); transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; z-index: 2; }
 .year input { display: block; margin-top: -6px !important; width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; height: var(--lineH); background: transparent no-repeat left bottom / 100% auto; margin: 0; }
 /* the handle is the dagger from Cecilia; the real handle is invisible under it */
-.year input::-webkit-slider-thumb { -webkit-appearance: none; width: 34px; height: 60px; background: transparent; border: 0; cursor: pointer; }
-.year input::-moz-range-thumb { width: 34px; height: 60px; background: transparent; border: 0; cursor: pointer; }
+.year input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 34px; height: 60px; background: none; border: 0; box-shadow: none; opacity: 0; cursor: pointer; }   /* iPhone would otherwise paint a white box */
+.year input::-moz-range-thumb { width: 34px; height: 60px; background: none; border: 0; box-shadow: none; opacity: 0; cursor: pointer; }
+.year input { -webkit-tap-highlight-color: transparent; } .year input:focus-visible { outline: none; }
+button, .mk { -webkit-tap-highlight-color: transparent; }
 .year output { font: 400 var(--big)/1.1 var(--cecilia); font-variant-numeric: tabular-nums; }
 .actions { display: flex; gap: 6px; align-items: flex-end; padding-bottom: calc(var(--lineH) / 2 - 1px); }
 .tot { display: grid; gap: 6px; align-self: start; }
