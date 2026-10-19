@@ -117,6 +117,8 @@ button, .mk { -webkit-tap-highlight-color: transparent; }
 label.f input:focus, label.f input:focus-visible { outline: none; }
 label.f input { caret-color: var(--ink); font-feature-settings: normal; font-kerning: normal; text-rendering: optimizeLegibility; }   /* typed names: the font's own letters and kerning, no alternates */
 ::selection { background: var(--ink); color: var(--bg); }
+/* controls are never selected as text when dragged or clicked twice */
+.year, .knob, .btn, .brand, .topnav, .chart, label.f > .jw, .ylab { -webkit-user-select: none; user-select: none; }
 
 /* layout B: results first, big; the fields in one line under them */
 .lay-b .panel { grid-template-columns: 96px repeat(3, minmax(0, 1fr)) auto;
