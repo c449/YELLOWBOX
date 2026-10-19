@@ -152,7 +152,17 @@ body:not(.result) .trail { display: none; }
 .btn.box img { visibility: hidden; }
 #roadsBtn[aria-pressed="true"] img, #aboutBtn[aria-expanded="true"] img, #whyBtn[aria-expanded="true"] img { visibility: visible; }
 #roadsBtn[aria-pressed="true"] .word, #aboutBtn[aria-expanded="true"] .word, #whyBtn[aria-expanded="true"] .word { color: var(--bg); }
-#aboutBtn img { transform: scale(-1, -1); }   /* ABOUT's box is WALK's, mirrored both ways */
+#aboutBtn img { transform: scale(-1, -1); }
+/* without its box, a word lines up on the left like the rest of the text */
+#roadsBtn[aria-pressed="false"] .word, #aboutBtn[aria-expanded="false"] .word { justify-content: flex-start; }
+@media (max-width: 860px) {
+  .topnav { gap: 24px; }
+  /* on a phone the map is short, so a place's card opens as a strip along the bottom of the screen */
+  .pop { position: fixed !important; left: 0 !important; right: 0 !important; top: auto !important; bottom: 0 !important;
+    transform: none !important; width: auto; max-width: none; padding: 16px var(--gutter-r) calc(16px + env(safe-area-inset-bottom, 0px)) var(--gutter-l);
+    border-top: 2px solid var(--ink); z-index: 20; }
+  .pop p { max-width: none; }
+}   /* ABOUT's box is WALK's, mirrored both ways */
 /* ABOUT is laid out like the walk sentence: the cross, then the text in the big size, in place of the walk */
 body.about-open .panel, body.about-open .trail { display: none; }
 .about { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: 40px; align-items: start; padding: 20px var(--gutter-r) 40px var(--gutter-l); }
