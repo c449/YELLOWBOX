@@ -34,6 +34,8 @@ button:focus-visible, input:focus-visible, .mk:focus-visible { outline: 2px soli
 
 /* the map */
 .chart { position: relative; overflow: hidden; width: 100%; aspect-ratio: 6749 / 2200; background: var(--bg); touch-action: none; cursor: grab; }
+/* on a phone the map shows three of its eight panels at a time, full height, from the west; swipe for the rest */
+@media (max-width: 860px) { .chart { aspect-ratio: 2531 / 2200; } }
 .chart.dragging { cursor: grabbing; }
 .stage { position: absolute; left: 0; top: 0; width: 6749px; height: 2200px; transform-origin: 0 0; will-change: transform; }
 .stage img.base { display: block; width: 6749px; height: 2200px; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
@@ -41,6 +43,8 @@ button:focus-visible, input:focus-visible, .mk:focus-visible { outline: 2px soli
 .tiles img { position: absolute; display: block; max-width: none; user-select: none; -webkit-user-drag: none; }
 .stage svg { z-index: 2; position: absolute; inset: 0; width: 6749px; height: 2200px; overflow: visible; }
 .mk { cursor: pointer; }
+.mk:focus { outline: none; } .mk:focus-visible .glyph { stroke: var(--ink); stroke-width: 3px; }   /* no browser-coloured ring */
+button:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .mk .hit { fill: transparent; }
 .mk .glyph { font: 400 34px var(--cecilia); fill: var(--ink); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 .mk.end .glyph { font-size: 46px; }
@@ -406,7 +410,7 @@ const chart = $('#chart'), stage = $('#stage'), ov = $('#ov');
 const view = {s:0.3, tx:0, ty:0};
 const W = 6749, H = 2200;
 const inner = () => ({width: chart.clientWidth, height: chart.clientHeight});
-function minScale() { const r = inner(); return Math.min(r.width/W, r.height/H); }
+function minScale() { const r = inner(); return Math.max(r.width/W, r.height/H); }   // the map always fills the frame's height (on a computer the frame has the map's own shape)
 function clampView() {
   const r = inner(); view.s = Math.max(minScale(), Math.min(4, view.s));
   const w = W*view.s, h = H*view.s;
@@ -452,7 +456,7 @@ function zoomAt(f, cx, cy) {
   const ns = Math.max(minScale(), Math.min(4, view.s*f)); const k = ns/view.s;
   view.tx = cx - (cx-view.tx)*k; view.ty = cy - (cy-view.ty)*k; view.s = ns; applyView();
 }
-function fitAll() { view.s = minScale(); applyView(); }
+function fitAll() { view.s = minScale(); view.tx = 0; view.ty = 0; applyView(); }   // start at the western edge
 chart.addEventListener('wheel', e => { e.preventDefault(); const r = chart.getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY*0.0015), e.clientX-r.left, e.clientY-r.top); }, {passive:false});
 const pts = new Map(); let moved = 0, pinch0 = null, downMk = null;
 chart.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('#pop')) return; downMk = e.target.closest ? e.target.closest('.mk') : null;
