@@ -1,0 +1,1401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<base href="/atlas/">
+<style>body{margin:0} [hidden]{display:none!important}</style>
+<title>ECCE ATLAS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+@font-face { font-family: "Cecilia"; src: url("looks/cecilia-Regular.otf?v=3") format("opentype"); font-display: block; }
+/* symbols missing from Cecilia (only %), kept in their own file so her font stays untouched */
+@font-face { font-family: "Cecilia Symbols"; src: url("looks/cecilia-symbols.otf") format("opentype"); font-display: block; }
+/* Layout: ATLAS on top, the whole Catalan Atlas edge to edge as the largest thing, the walk planner below it,
+   and one line of the cities crossed. Every word is in Cecilia Regular, in caps. */
+:root {
+  --big: 2.4rem; --small: 1rem; --lineH: 8.84px; /* height of the serif line */ /* only two text sizes; when in doubt, the bigger one */
+  --bg: #ffffff; --ink: #0d0d0d; --bad: #0000ff;
+  --f: "Cecilia", "Cecilia Symbols", "Times New Roman", serif; --cecilia: "Cecilia", "Cecilia Symbols", "Times New Roman", serif;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px)); --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: light;
+}
+html, body { min-height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 var(--small)/1.3 var(--f); text-transform: uppercase; }
+b, strong, button, input, output, label { font-family: var(--f); font-weight: 400; }
+/* letters keep the font's own spacing (its kerning), nothing added */
+html { font-kerning: normal; letter-spacing: 0; }
+/* the titles use the font's own set 3 letters (its other A and C) */
+.brand, label.f, .year .ylab, .btn { font-feature-settings: "ss03"; }
+button, input { font: inherit; text-transform: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, .mk:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+.brand { margin: 0; padding-block: 12px 10px; padding-left: var(--gutter-l); padding-right: var(--gutter-r); font: 400 calc(var(--big) * 2)/1 var(--cecilia); }
+
+/* the map */
+.chart { position: relative; overflow: hidden; width: 100%; aspect-ratio: 6749 / 2200; background: var(--bg); touch-action: none; cursor: grab; }
+.chart.dragging { cursor: grabbing; }
+.stage { position: absolute; left: 0; top: 0; width: 6749px; height: 2200px; transform-origin: 0 0; will-change: transform; }
+.stage img.base { display: block; width: 6749px; height: 2200px; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.tiles { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.tiles img { position: absolute; display: block; max-width: none; user-select: none; -webkit-user-drag: none; }
+.stage svg { z-index: 2; position: absolute; inset: 0; width: 6749px; height: 2200px; overflow: visible; }
+.mk { cursor: pointer; }
+.mk .hit { fill: transparent; }
+.mk .glyph { font: 400 34px var(--cecilia); fill: var(--ink); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.mk.end .glyph { font-size: 46px; }
+.mk .lb { font: 400 var(--small) var(--f); fill: var(--ink); pointer-events: none; display: none; }
+.mk.show .lb { display: inline; }
+.road { fill: none; stroke: var(--ink); stroke-dasharray: 6 5; }
+.route { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-linejoin: round; }
+
+/* what you clicked on the map */
+.pop { width: max-content; max-width: 300px; position: absolute; z-index: 5; transform: translate(-50%, calc(-100% - 22px)); background: var(--bg); padding: 10px 12px; display: grid; gap: 8px; justify-items: start; white-space: nowrap; }
+.pop b { font: 400 var(--big)/1 var(--cecilia); white-space: normal; }
+.pop p { margin: 0; font-size: var(--small); line-height: 1.3; white-space: normal; max-width: 34ch; }
+.pop .row { display: flex; gap: 6px; }
+
+.btn { border: 0; background: var(--ink); color: var(--bg); padding: 4px 9px; font-size: var(--small); cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.on { background: var(--ink); color: var(--bg); }
+.btn[disabled] { display: none !important; }
+.pop .btn[disabled] { display: none; }
+/* on the map, the step to take next is red */
+.pop .btn.next { background: var(--bad); color: var(--bg); }
+
+/* the planner: fields on one row, results aligned under them, the explanation below when asked */
+.panel { display: grid; grid-template-columns: 96px repeat(3, minmax(0, 1fr)) auto;
+  grid-template-areas: "cross from to year act" "cross days km alive ." "cross why why why .";
+  column-gap: 40px; row-gap: 22px; align-items: end;
+  padding-block: 20px 6px; padding-left: var(--gutter-l); padding-right: var(--gutter-r); }
+.cross { grid-area: cross; align-self: start; display: block; width: 96px; height: auto; }
+.from { grid-area: from; } .to { grid-area: to; } .year { grid-area: year; } .actions { grid-area: act; }
+.days { grid-area: days; } .km { grid-area: km; } .alive { grid-area: alive; } .whytext { grid-area: why; }
+label.f { display: grid; gap: 8px; font-size: 1.25rem; line-height: 1; }
+label.f input { width: 100%; box-sizing: border-box; border: 0; border-radius: 0; background: transparent no-repeat left bottom / 100% auto; padding: 0 0 calc(2px + var(--lineH)); margin: 0; line-height: 1.1; font-size: var(--big); }
+label.f.bad input { color: var(--bad); }
+.year { display: grid; gap: 8px; }   /* built like the fields: word, big value, the line under it */
+.year .ylab { font-size: 1.25rem; line-height: 1; }
+.year output { order: 1; }
+.year .track { order: 2; position: relative; display: block; }
+.year .knob { position: absolute; top: calc(4px + var(--lineH) - var(--own, var(--lineH)) / 2 - .5px); transform: translate(-50%, -62%); font: 700 calc(var(--big) * 1.6)/1 var(--cecilia); pointer-events: none; }
+.year input { display: block; margin-top: -6px !important; width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; height: var(--lineH); background: transparent no-repeat left bottom / 100% auto; margin: 0; }
+/* the handle is the dagger from Cecilia; the real handle is invisible under it */
+.year input::-webkit-slider-thumb { -webkit-appearance: none; width: 34px; height: 60px; background: transparent; border: 0; cursor: pointer; }
+.year input::-moz-range-thumb { width: 34px; height: 60px; background: transparent; border: 0; cursor: pointer; }
+.year output { font: 400 var(--big)/1.1 var(--cecilia); font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 6px; align-items: flex-end; padding-bottom: calc(var(--lineH) / 2 - 1px); }
+.tot { display: grid; gap: 6px; align-self: start; }
+.tot b { font: 400 var(--big)/1 var(--cecilia); font-variant-numeric: tabular-nums; }
+.tot span { font-size: var(--small); display: flex; align-items: center; gap: 10px; }
+.whytext { display: grid; gap: .5em; font: 400 var(--big)/1.3 var(--f); max-width: 34ch; align-self: start; }   /* WHY reads at the size of ABOUT */
+.whytext p { margin: 0; }
+
+/* one line: every city crossed, with the km left */
+.trail { display: flex; gap: 22px; overflow-x: auto; white-space: nowrap; padding-block: 14px 22px; padding-left: var(--gutter-l); padding-right: var(--gutter-r); scrollbar-width: thin; scrollbar-color: var(--ink) var(--bg); }
+.trail:empty { display: none; }
+.trail span b { font: 400 var(--small) var(--cecilia); margin-left: 6px; }
+.trail i { font: 400 var(--small) var(--cecilia); font-style: normal; }
+.trail span.now { text-decoration: underline; text-underline-offset: 4px; }
+
+
+/* typing: the field's own line turns black instead of a box around it */
+label.f input:focus, label.f input:focus-visible { outline: none; }
+label.f input { caret-color: var(--ink); font-feature-settings: normal; font-kerning: normal; text-rendering: optimizeLegibility; }   /* typed names: the font's own letters and kerning, no alternates */
+::selection { background: var(--ink); color: var(--bg); }
+
+/* layout B: results first, big; the fields in one line under them */
+.lay-b .panel { grid-template-columns: 96px repeat(3, minmax(0, 1fr)) auto;
+  grid-template-areas: "cross days km alive act" "cross from to year ." "cross why why why ."; row-gap: 26px; }
+.lay-b .actions { align-self: end; padding-bottom: 14px; }
+
+/* layout C: two halves; the walk on the left, the result on the right */
+.lay-c .panel { grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "cross from from days km" "cross to to alive alive" "cross year year act act" "cross . . why why"; row-gap: 22px; column-gap: 48px; }
+.lay-c .actions { padding-bottom: 0; }
+
+@media (max-width: 860px) {
+  :root { --big: 1.8rem; }
+  .panel { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 16px; row-gap: 20px;
+    grid-template-areas: "cross cross cross" "from from from" "to to to" "year year year" "days km alive" "act act act" "why why why"; }
+  .cross { width: 64px; }
+}
+
+/* two moments: first the fields, then one sentence with the answer */
+.sentence { grid-area: sent; display: none; margin: 0; font: 400 var(--big)/1.3 var(--f); max-width: 34ch; }
+.sentence b { font-weight: 700; }
+.sentence { cursor: text; }
+/* WALK is Ceci's own button image, used as it is; the button shows the black part of it
+   (in the file the black runs from x 271 to 2176 and y 369 to 1267 of 2477 x 1696) */
+#go { --w: 140px; display: block; width: var(--w); height: calc(var(--w) * 898 / 1905); overflow: hidden; padding: 0; background: none; }
+#go img { display: block; width: calc(var(--w) * 2477 / 1905); height: auto; margin: calc(var(--w) * -369 / 1905) 0 0 calc(var(--w) * -271 / 1905); }
+.tot, .whytext, #stop, #whyBtn { display: none; }
+.result label.f, .result .year { display: none; }
+.result .sentence { display: block; }
+.result #stop { display: inline-block; } .result #whyBtn { display: block; }
+/* in the result only WHY stays: no WALK; closed, WHY lines up with the sentence; open, it sits centred in its box */
+.result #go, .result #stop { display: none !important; }
+.result #whyBtn[aria-expanded="false"] .word { justify-content: flex-start; }
+.result .whytext:not([hidden]) { display: grid; }
+.result .panel { grid-template-columns: 96px minmax(0, 1fr); grid-template-areas: "cross sent" "cross act" "cross why"; row-gap: 22px; align-items: start; }
+body:not(.result) .trail { display: none; }
+/* ROADS on the title line, at the right, the same size and box as WALK */
+.top { display: flex; justify-content: space-between; align-items: center; padding-right: var(--gutter-r); }
+.topnav { display: flex; gap: 6px; }
+/* ROADS and ABOUT get the same drawn box as WALK (Ceci's drawing 1), shown at WALK's size: the black part, 140px wide
+   (in the file the black runs from x 10 to 285 and y 10 to 143 of 296 x 154) */
+.btn.box { --w: 140px; position: relative; padding: 0; background: none; font-size: var(--big); line-height: 1; width: var(--w); height: calc(var(--w) * 134 / 276); overflow: hidden; }
+.btn.box img { display: block; width: calc(var(--w) * 296 / 276); height: auto; margin: calc(var(--w) * -10 / 276) 0 0 calc(var(--w) * -10 / 276); }
+.btn.box.on { background: none; }
+.btn.box .word { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; padding-top: .14em; color: var(--ink); }
+/* the box only shows while the button is on: ROADS drawn, ABOUT open */
+.btn.box img { visibility: hidden; }
+#roadsBtn[aria-pressed="true"] img, #aboutBtn[aria-expanded="true"] img, #whyBtn[aria-expanded="true"] img { visibility: visible; }
+#roadsBtn[aria-pressed="true"] .word, #aboutBtn[aria-expanded="true"] .word, #whyBtn[aria-expanded="true"] .word { color: var(--bg); }
+#aboutBtn img { transform: scale(-1, -1); }   /* ABOUT's box is WALK's, mirrored both ways */
+/* ABOUT is laid out like the walk sentence: the cross, then the text in the big size, in place of the walk */
+body.about-open .panel, body.about-open .trail { display: none; }
+.about { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: 40px; align-items: start; padding: 20px var(--gutter-r) 40px var(--gutter-l); }
+.about:not([hidden]) { display: grid; }
+.about .cross { grid-area: auto; }
+.abouttext { display: grid; gap: .5em; font: 400 var(--big)/1.3 var(--f); max-width: 34ch; }
+.about p { margin: 0; }
+@media (max-width: 860px) { .about { grid-template-columns: minmax(0, 1fr); row-gap: 20px; } .about .cross { width: 64px; } }
+/* in the result, WHY sits level with the middle of WALK */
+.result .actions { align-items: center; gap: 24px; padding-bottom: 0; }
+.j { position: relative; }
+.brand { cursor: pointer; }
+/* the title is logo 2, set from Cecilia's own glyphs: E C, C with E inside, the third A, T, the LA ligature, S */
+.brand .logo { display: inline-block; vertical-align: baseline; height: calc(var(--big) * 2 * .732); width: auto; }
+/* FROM, TO and YEAR a step heavier than the rest */
+label.f > .jw, label.f > .jw *, .ylab, .ylab * { -webkit-text-stroke: .05em currentColor; }
+/* the title's two As are two of the font's own alternates: the third A, then the fourth */
+.brand .a3 { font-feature-settings: "ss03"; } .brand .a4 { font-feature-settings: "ss04"; }
+/* all text a touch heavier: a hairline outline in the text's own colour, the font itself unchanged */
+* { -webkit-text-stroke: .014em currentColor; }   /* set on every element so big text gets a proportionally thicker outline */
+.mk .lb { stroke: var(--ink); stroke-width: .3px; }   /* a letter set a pixel high or low */
+@media (max-width: 860px) { .top { flex-wrap: wrap; } .topnav { padding-left: var(--gutter-l); padding-bottom: 10px; } }
+@media (min-width: 861px) { body:not(.result) .panel { grid-template-areas: "cross from to year act"; } }
+@media (max-width: 860px) {
+  .result .panel { grid-template-columns: minmax(0, 1fr); grid-template-areas: "cross" "sent" "act" "why"; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<header class="top"><h1 class="brand" role="button" tabindex="0"><img class="logo" src="looks/ecce-atlas.svg" alt="Ecce Atlas"></h1><nav class="topnav"><button class="btn ghost box" id="roadsBtn" aria-pressed="false"><img src="looks/buttons/walk-1-dark.jpg" alt=""><span class="word">Roads</span></button><button class="btn ghost box" id="aboutBtn" aria-expanded="false" aria-controls="about"><img src="looks/buttons/walk-1-dark.jpg" alt=""><span class="word">About</span></button></nav></header>
+<div class="chart" id="chart" aria-label="The complete Catalan Atlas of 1375. Drag to move, scroll or pinch to zoom. Click a place to walk from or to it.">
+  <div class="stage" id="stage">
+    <img class="base" src="atlas_base.jpg" alt="The complete Catalan Atlas (Abraham Cresques, 1375), all eight panels from the Atlantic to China" draggable="false">
+    <div class="tiles" id="tiles"></div>
+    <svg id="ov" viewBox="0 0 6749 2200"></svg>
+  </div>
+  <div class="pop" id="pop" hidden><b id="popName"></b><p id="popNote"></p><div class="row"><button class="btn" id="popFrom">Walk from here</button><button class="btn" id="popTo">Walk to here</button></div></div>
+</div>
+<div class="panel">
+  <img class="cross" src="looks/cross.gif" alt="">
+  <label class="f from" for="from">From<input id="from" type="text" autocomplete="off" spellcheck="false"></label>
+  <label class="f to" for="to">To<input id="to" type="text" autocomplete="off" spellcheck="false"></label>
+  <div class="year"><label class="ylab" for="year">Year</label><span class="track"><input type="range" id="year" min="1300" max="1400" value="1375"><span class="knob" id="knob" aria-hidden="true">†</span></span><output id="yearOut" for="year">1250</output></div>
+  <div class="actions"><button class="btn" id="go" aria-label="Walk"><img src="looks/buttons/walk-ceci.png" alt=""></button><button class="btn ghost" id="stop" disabled>Stop</button><button class="btn ghost box" id="whyBtn" aria-expanded="false" aria-controls="why" disabled><img src="looks/buttons/walk-1-dark.jpg" alt=""><span class="word">Why</span></button></div>
+  <p class="sentence" id="sentence"></p>
+  <div class="tot days"><b id="tDays">—</b><span>Days</span></div>
+  <div class="tot km"><b id="tKm">—</b><span>Km</span></div>
+  <div class="tot alive"><b id="tAlive">—</b><span>Alive</span></div>
+  <div class="whytext" id="why" hidden></div>
+</div>
+<div class="trail" id="trail"></div>
+<section class="about" id="about" hidden>
+  <img class="cross" src="looks/cross.gif" alt="">
+  <div class="abouttext">
+  <p>The map is the Catalan Atlas, made in Majorca in 1375 and attributed to Abraham Cresques.</p>
+  <p>Type where you walk from and where you walk to. ECCE ATLAS follows the old roads and counts the days, the kilometres and the chance of arriving alive.</p>
+  <p>The days and the chances are estimates.</p>
+  </div>
+</section>
+
+<script>
+// ------------------------------------------------------------------ data
+// x, y: position on the full atlas image (6749 x 2200). lat, lon: true position, used for distances.
+const P = [
+ {id:'lisboa', name:'Lisbon', lat:38.72, lon:-9.14, x:805, y:1345},
+ {id:'dublin', name:'Dublin', lat:53.35, lon:-6.26, x:808, y:543},
+ {id:'santiago', name:'Santiago de Compostela', lat:42.88, lon:-8.54, x:835, y:1215},
+ {id:'marrakech', name:'Marrakesh', lat:31.63, lon:-8.0, x:850, y:1715},
+ {id:'leon', name:'León', lat:42.6, lon:-5.57, x:928, y:1172},
+ {id:'sevilla', name:'Seville', lat:37.39, lon:-5.98, x:948, y:1362},
+ {id:'fes', name:'Fez', lat:34.03, lon:-5.0, x:965, y:1645},
+ {id:'london', name:'London', lat:51.51, lon:-0.13, x:985, y:690},
+ {id:'toledo', name:'Toledo', lat:39.86, lon:-4.02, x:1000, y:1252},
+ {id:'edinburgh', name:'Edinburgh', lat:55.95, lon:-3.19, x:1003, y:389},
+ {id:'burgos', name:'Burgos', lat:42.34, lon:-3.7, x:1005, y:1185},
+ {id:'canterbury', name:'Canterbury', lat:51.28, lon:1.08, x:1025, y:705},
+ {id:'granada', name:'Granada', lat:37.18, lon:-3.6, x:1040, y:1350},
+ {id:'york', name:'York', lat:53.96, lon:-1.08, x:1043, y:497},
+ {id:'sijilmasa', name:'Sijilmasa', lat:31.28, lon:-4.27, x:1050, y:1730},
+ {id:'pamplona', name:'Pamplona', lat:42.82, lon:-1.64, x:1058, y:1125},
+ {id:'zaragoza', name:'Saragossa', lat:41.65, lon:-0.89, x:1092, y:1228},
+ {id:'tlemcen', name:'Tlemcen', lat:34.88, lon:-1.32, x:1095, y:1650},
+ {id:'bordeaux', name:'Bordeaux', lat:44.84, lon:-0.58, x:1112, y:965},
+ {id:'mali', name:'Mali', lat:11.38, lon:-8.38, x:1120, y:2095},
+ {id:'paris', name:'Paris', lat:48.86, lon:2.35, x:1124, y:800},
+ {id:'taghaza', name:'Taghaza', lat:23.3, lon:-5.0, x:1150, y:1880},
+ {id:'tours', name:'Tours', lat:47.39, lon:0.69, x:1170, y:880},
+ {id:'toulouse', name:'Toulouse', lat:43.6, lon:1.44, x:1182, y:992},
+ {id:'barcelona', name:'Barcelona', lat:41.39, lon:2.17, x:1185, y:1108},
+ {id:'bruges', name:'Bruges', lat:51.21, lon:3.22, x:1186, y:470},
+ {id:'timbuktu', name:'Timbuktu', lat:16.77, lon:-3.0, x:1210, y:2080},
+ {id:'aachen', name:'Aachen', lat:50.78, lon:6.08, x:1228, y:612},
+ {id:'koln', name:'Cologne', lat:50.94, lon:6.96, x:1285, y:595},
+ {id:'montpellier', name:'Montpellier', lat:43.61, lon:3.88, x:1300, y:968},
+ {id:'lyon', name:'Lyon', lat:45.76, lon:4.84, x:1350, y:862},
+ {id:'arles', name:'Arles', lat:43.68, lon:4.63, x:1360, y:944},
+ {id:'marseille', name:'Marseille', lat:43.3, lon:5.37, x:1418, y:966},
+ {id:'gao', name:'Gao', lat:16.27, lon:0.04, x:1510, y:2060},
+ {id:'genova', name:'Genoa', lat:44.41, lon:8.93, x:1714, y:822},
+ {id:'tunis', name:'Tunis', lat:36.8, lon:10.18, x:1735, y:1470},
+ {id:'milano', name:'Milan', lat:45.46, lon:9.19, x:1742, y:762},
+ {id:'pisa', name:'Pisa', lat:43.72, lon:10.4, x:1752, y:902},
+ {id:'prague', name:'Prague', lat:50.08, lon:14.43, x:1810, y:470},
+ {id:'firenze', name:'Florence', lat:43.77, lon:11.26, x:1830, y:860},
+ {id:'siena', name:'Siena', lat:43.32, lon:11.33, x:1850, y:915},
+ {id:'venezia', name:'Venice', lat:45.44, lon:12.32, x:1888, y:772},
+ {id:'roma', name:'Rome', lat:41.9, lon:12.5, x:1902, y:995},
+ {id:'tripoli', name:'Tripoli', lat:32.89, lon:13.18, x:1960, y:1480},
+ {id:'napoli', name:'Naples', lat:40.85, lon:14.27, x:1985, y:1078},
+ {id:'ancona', name:'Ancona', lat:43.62, lon:13.52, x:1985, y:880},
+ {id:'bari', name:'Bari', lat:41.12, lon:16.87, x:2078, y:1032},
+ {id:'brindisi', name:'Brindisi', lat:40.63, lon:17.94, x:2118, y:1088},
+ {id:'ragusa', name:'Ragusa', lat:42.65, lon:18.09, x:2210, y:975},
+ {id:'costantinoble', name:'Constantinople', lat:41.01, lon:28.98, x:2832, y:888},
+ {id:'alexandria', name:'Alexandria', lat:31.2, lon:29.92, x:2865, y:1530},
+ {id:'babilonia', name:'Babylon of Egypt', lat:30.04, lon:31.24, x:2962, y:1560},
+ {id:'jaffa', name:'Jaffa', lat:32.05, lon:34.75, x:3085, y:1385},
+ {id:'acre', name:'Acre', lat:32.93, lon:35.08, x:3095, y:1322},
+ {id:'jerusalem', name:'Jerusalem', lat:31.78, lon:35.23, x:3134, y:1384},
+ {id:'damasc', name:'Damascus', lat:33.51, lon:36.29, x:3192, y:1185},
+ {id:'baghdad', name:'Baghdad', lat:33.31, lon:44.37, x:3440, y:1350},
+ {id:'tabriz', name:'Tabriz', lat:38.08, lon:46.29, x:3590, y:890},
+ {id:'shiraz', name:'Shiraz', lat:29.6, lon:52.5, x:3880, y:1130},
+ {id:'kerman', name:'Kerman', lat:30.28, lon:57.08, x:4000, y:1460},
+ {id:'hormuz', name:'Hormuz', lat:27.1, lon:56.4, x:4110, y:1490},
+ {id:'bukhara', name:'Bukhara', lat:39.77, lon:64.42, x:4490, y:800},
+ {id:'samarkand', name:'Samarkand', lat:39.65, lon:66.96, x:4600, y:820},
+ {id:'cambay', name:'Cambay', lat:22.31, lon:72.62, x:4650, y:1610},
+ {id:'delhi', name:'Delhi', lat:28.61, lon:77.21, x:4810, y:1640},
+ {id:'khotan', name:'Khotan', lat:37.11, lon:79.93, x:4840, y:650},
+ {id:'kabul', name:'Kabul', lat:34.53, lon:69.17, x:5030, y:1110},
+ {id:'karakorum', name:'Karakorum', lat:47.2, lon:102.8, x:5520, y:1040},
+ {id:'ganzhou', name:'Ganzhou', lat:38.93, lon:100.45, x:5690, y:1050},
+ {id:'cansay', name:'Cansay', lat:30.27, lon:120.15, x:6070, y:1520},
+ {id:'khanbaliq', name:'Khanbaliq', lat:39.9, lon:116.4, x:6230, y:1010},
+ {id:'zaiton', name:'Zaiton', lat:24.9, lon:118.6, x:6290, y:1530},
+ // sites of interest
+ {id:'msm', name:'Mont-Saint-Michel', lat:48.64, lon:-1.51, x:1040, y:800, site:true},
+ {id:'bethlehem', name:'Bethlehem', lat:31.70, lon:35.20, x:3150, y:1410, site:true},
+ {id:'sinai', name:'Mount Sinai', lat:28.54, lon:33.97, x:3230, y:1580, site:true},
+ {id:'medina', name:'Medina', lat:24.47, lon:39.61, x:3570, y:1760, site:true},
+ {id:'mecca', name:'Mecca', lat:21.42, lon:39.83, x:3450, y:1840, site:true},
+ {id:'ararat', name:'Mount Ararat', lat:39.70, lon:44.30, x:3790, y:690, site:true},
+];
+const E = [
+ ['santiago','leon','r'],['leon','burgos','r'],['burgos','pamplona','r'],['pamplona','zaragoza','r'],['zaragoza','barcelona','r'],['burgos','toledo','r'],['toledo','sevilla','r'],['toledo','granada','r'],['sevilla','granada','r'],['santiago','lisboa','r'],['lisboa','sevilla','r'],['pamplona','bordeaux','a'],['pamplona','toulouse','a'],['barcelona','montpellier','r'],['bordeaux','tours','r'],['tours','paris','r'],['bordeaux','toulouse','r'],['toulouse','montpellier','r'],['montpellier','arles','r'],['arles','marseille','r'],['arles','lyon','r'],['lyon','paris','r'],['paris','bruges','r'],['london','canterbury','r'],['london','york','r'],['york','edinburgh','r'],['bruges','aachen','r'],['aachen','koln','r'],['koln','lyon','r'],['koln','milano','a'],['lyon','milano','a'],['koln','prague','r'],['prague','venezia','a'],['marseille','genova','r'],['milano','genova','r'],['milano','venezia','r'],['genova','pisa','r'],['pisa','firenze','r'],['firenze','siena','r'],['siena','roma','r'],['venezia','firenze','r'],['venezia','ancona','r'],['ancona','roma','r'],['roma','napoli','r'],['napoli','bari','r'],['bari','brindisi','r'],['venezia','ragusa','r'],['ragusa','costantinoble','r'],['damasc','acre','r'],['acre','jaffa','r'],['jaffa','jerusalem','r'],['damasc','jerusalem','r'],['jerusalem','babilonia','d'],['babilonia','alexandria','r'],['alexandria','tripoli','d'],['tripoli','tunis','r'],['tunis','tlemcen','r'],['tlemcen','fes','r'],['fes','marrakech','r'],['fes','sijilmasa','a'],['marrakech','sijilmasa','a'],['sijilmasa','taghaza','d'],['taghaza','timbuktu','d'],['timbuktu','mali','r'],['timbuktu','gao','r'],['damasc','baghdad','d'],['baghdad','tabriz','r'],['baghdad','shiraz','r'],['shiraz','kerman','r'],['kerman','hormuz','r'],['bukhara','samarkand','r'],['samarkand','kabul','a'],['delhi','cambay','r'],['kerman','kabul','d'],['samarkand','khotan','a'],['ganzhou','karakorum','d'],['ganzhou','khanbaliq','r'],['karakorum','khanbaliq','d'],['khanbaliq','cansay','r'],['cansay','zaiton','r'],
+ ['msm','paris','r'],['msm','tours','r'],['bethlehem','jerusalem','r'],['sinai','babilonia','d'],['sinai','jerusalem','d'],['medina','damasc','d'],['medina','mecca','d'],['ararat','tabriz','r'],
+];
+const byId = Object.fromEntries(P.map(p => [p.id, p]));
+// roads (r), mountain passes (a), desert tracks (d), short sea crossings (f)
+const FACTOR = {r:1.25, a:1.45, d:1.3, f:1.25};   // winding of real paths over the straight line
+const KM_PER_DAY = 25;                             // a steady day's walk
+const CROSSING_DAYS = 1;                           // waiting in port for a boat and a wind
+const SAIL_KM_PER_DAY = 100;                       // a boat covers about four days' walk in a day
+
+const rad = d => d*Math.PI/180;
+function km(a, b) {
+  const dlat = rad(b.lat-a.lat), dlon = rad(b.lon-a.lon);
+  const h = Math.sin(dlat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dlon/2)**2;
+  return 2*6371*Math.asin(Math.sqrt(h));
+}
+const adj = {}; P.forEach(p => adj[p.id] = []);
+E.forEach(([a, b, m]) => { const d = km(byId[a], byId[b])*FACTOR[m]; const t = m === 'f' ? d/SAIL_KM_PER_DAY + CROSSING_DAYS : d/KM_PER_DAY;
+  adj[a].push({to:b, m, km:d, days:t}); adj[b].push({to:a, m, km:d, days:t}); });
+function route(from, to) {
+  const dist = {}, prev = {}, done = new Set(); P.forEach(p => dist[p.id] = Infinity); dist[from] = 0;
+  while (true) {
+    let u = null, best = Infinity;
+    for (const id in dist) if (!done.has(id) && dist[id] < best) { best = dist[id]; u = id; }
+    if (u === null || u === to) break;
+    done.add(u);
+    if (u !== from && byId[u].terminal) continue;
+    for (const e of adj[u]) { const c = e.days*(e.road || u === from || e.to === to ? 1 : 1.3);   // a small preference for named roads, never a long detour
+      if (dist[u] + c < dist[e.to]) { dist[e.to] = dist[u] + c; prev[e.to] = {from:u, ...e}; } }
+  }
+  if (!isFinite(dist[to])) return null;
+  const legs = []; let c = to;
+  while (c !== from) { const pv = prev[c]; legs.unshift({a:pv.from, b:c, m:pv.m, km:pv.km, days:pv.days, road:pv.road}); c = pv.from; }
+  return legs;
+}
+
+
+// ------------------------------------------------------------------ risk of dying on the road (an estimate, not a record)
+// Daily chance of death for a walker by kind of road: disease, exposure, accidents, robbery.
+const HAZARD = {r:0.0004, a:0.0012, d:0.003, f:0.0004};
+const CROSSING_RISK = 0.004;   // each boat crossing
+const REGION = {
+  levant:['costantinoble','damasc','acre','jaffa','jerusalem','nazareth','bethlehem','babilonia','alexandria','sinai'],
+  arabia:['mecca','medina'],
+  africa:['fes','marrakech','sijilmasa','tlemcen','tunis','tripoli','taghaza','timbuktu','mali','gao'],
+  persia:['baghdad','tabriz','shiraz','kerman','hormuz','ararat'],
+  steppe:['bukhara','samarkand','khotan','karakorum','ganzhou'],
+  india:['kabul','delhi','cambay'],
+  cathay:['khanbaliq','cansay','zaiton'],
+};
+const regionOf = {}; Object.entries(REGION).forEach(([r, ids]) => ids.forEach(id => regionOf[id] = r));
+// how much more dangerous a place's roads are in a given year than a quiet European road
+const inFrance = id => { const p = byId[id]; return p && p.lat > 42.6 && p.lat < 50.9 && p.lon > -4.8 && p.lon < 7; };
+const inNorth = id => { const p = byId[id]; return p && p.lat > 47; };
+function danger(id, y) {
+  const r = regionOf[id] || 'west';
+  if (r === 'west') {
+    if (y >= 1347 && y <= 1351) return 5;                                          // the Black Death
+    if ((y >= 1361 && y <= 1363) || y === 1369 || y === 1374 || y === 1375) return 2;   // the plague returns
+    if (inFrance(id) && ((y >= 1337 && y <= 1360) || (y >= 1369 && y <= 1389))) return 2;   // Hundred Years' War
+    if (inNorth(id) && y >= 1315 && y <= 1317) return 2;                            // the Great Famine
+    return 1;
+  }
+  if (r === 'levant') {
+    if (y >= 1347 && y <= 1349) return 5;    // the Black Death in Egypt and Syria
+    if (y === 1400) return 3;                // Timur invades Syria
+    if (id === 'costantinoble' && y >= 1354) return 2;   // the Ottomans take the Balkans
+    return 1.5;
+  }
+  if (r === 'persia' || r === 'steppe') {
+    if (y >= 1381) return 3;                 // Timur's conquests
+    if (r === 'persia' && y >= 1335) return 2;   // the Mongol state in Persia breaks up
+    return 0.8;                              // Pax Mongolica: guarded roads and relay posts
+  }
+  if (r === 'cathay') return y >= 1351 && y <= 1368 ? 2.5 : 1;   // rebellions end Mongol rule; the Ming from 1368
+  if (r === 'arabia') return 1.5;                                  // raids on caravans
+  if (r === 'india') return y >= 1398 && y <= 1399 ? 3 : 1.5;     // Timur sacks Delhi
+  return 1.2;                                                      // North Africa and the Sahara
+}
+function survival(legs, y) {
+  let h = 0;
+  legs.forEach(l => { const m = Math.max(danger(l.a, y), danger(l.b, y));
+    h += (l.days - (l.m === 'f' ? CROSSING_DAYS : 0)) * HAZARD[l.m] * m + (l.m === 'f' ? CROSSING_RISK : 0); });
+  return Math.exp(-h);
+}
+const pct = v => v > 0.995 ? '99%' : v < 0.01 ? '<1%' : Math.round(v*100) + '%';
+
+// ------------------------------------------------------------------ state
+const $ = s => document.querySelector(s);
+const state = {from:null, to:null, year:1375};   // 1375: the year of the atlas
+try { const s0 = JSON.parse(localStorage.getItem('atlas-walk') || '{}'); if (s0.year >= 1300 && s0.year <= 1400) state.year = s0.year; } catch (e) {}
+function save() { try { localStorage.setItem('atlas-walk', JSON.stringify(state)); } catch (e) {} }
+
+// ------------------------------------------------------------------ chart: pan & zoom
+const chart = $('#chart'), stage = $('#stage'), ov = $('#ov');
+const view = {s:0.3, tx:0, ty:0};
+const W = 6749, H = 2200;
+const inner = () => ({width: chart.clientWidth, height: chart.clientHeight});
+function minScale() { const r = inner(); return Math.min(r.width/W, r.height/H); }
+function clampView() {
+  const r = inner(); view.s = Math.max(minScale(), Math.min(4, view.s));
+  const w = W*view.s, h = H*view.s;
+  view.tx = w < r.width ? (r.width-w)/2 : Math.min(0, Math.max(r.width-w, view.tx));
+  view.ty = h < r.height ? (r.height-h)/2 : Math.min(0, Math.max(r.height-h, view.ty));
+}
+function applyView() {
+  clampView(); stage.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.s})`;
+  // symbols keep their size on screen, but shrink on narrow screens where the whole atlas is small
+  const k = Math.max(0.42, Math.min(1, chart.clientWidth/1300))/view.s;
+  ov.querySelectorAll('.mk').forEach(g => g.setAttribute('transform', `translate(${g.dataset.x} ${g.dataset.y}) scale(${k})`));
+  ov.querySelectorAll('.route').forEach(r => r.setAttribute('stroke-width', 3.5*k));
+  ov.querySelectorAll('.road').forEach(r => r.setAttribute('stroke-width', 1.6*k));
+  ov.querySelectorAll('.route.sea').forEach(r => r.setAttribute('stroke-dasharray', `${9*k} ${7*k}`));
+  const tok = ov.querySelector('.token'); if (tok) tok.setAttribute('transform', `translate(${tok.dataset.x} ${tok.dataset.y}) scale(${k})`);
+  labels(); placePop();
+  clearTimeout(tileTimer); tileTimer = setTimeout(loadTiles, 120);
+}
+
+// ------------------------------------------------------------------ sharper map when zoomed: tiles cut from the original scan, no retouching
+// level 1: the scan at 6,749 px wide; level 2: the full scan, 11,811 px wide. Tiles are 512 px.
+const LEVELS = {1:{w:6749, h:2200, nx:14, ny:5}, 2:{w:11811, h:3850, nx:24, ny:8}};
+const tileEls = {}; let tileTimer = null;
+function loadTiles() {
+  const dpr = window.devicePixelRatio || 1, px = view.s*dpr;          // screen pixels per map unit
+  const want = px > 1.15 ? [1, 2] : px > 0.55 ? [1] : [];
+  const r = inner(), x0 = -view.tx/view.s, y0 = -view.ty/view.s, x1 = x0 + r.width/view.s, y1 = y0 + r.height/view.s;
+  want.forEach(lv => { const L = LEVELS[lv], k = W/L.w, T = 512*k;
+    for (let ty = Math.max(0, Math.floor(y0/T)); ty <= Math.min(L.ny-1, Math.floor(y1/T)); ty++)
+      for (let tx = Math.max(0, Math.floor(x0/T)); tx <= Math.min(L.nx-1, Math.floor(x1/T)); tx++) {
+        const key = lv + '/' + tx + '_' + ty; if (tileEls[key]) continue;
+        const im = new Image(); im.decoding = 'async'; im.alt = '';
+        im.style.left = tx*T + 'px'; im.style.top = ty*T + 'px';
+        im.style.width = Math.min(512, L.w - tx*512)*k + 'px'; im.style.height = Math.min(512, L.h - ty*512)*k + 'px';
+        im.style.zIndex = lv; im.style.opacity = 0; im.onload = () => { im.style.opacity = 1; };
+        im.src = `tiles/${key}.jpg`; tileEls[key] = im; $('#tiles').appendChild(im);
+      } });
+}
+let touched = false;   // once someone zooms, the page never jumps back to the whole map on its own
+function zoomAt(f, cx, cy) {
+  touched = true;
+  const r = chart.getBoundingClientRect(); cx ??= r.width/2; cy ??= r.height/2;
+  const ns = Math.max(minScale(), Math.min(4, view.s*f)); const k = ns/view.s;
+  view.tx = cx - (cx-view.tx)*k; view.ty = cy - (cy-view.ty)*k; view.s = ns; applyView();
+}
+function fitAll() { view.s = minScale(); applyView(); }
+chart.addEventListener('wheel', e => { e.preventDefault(); const r = chart.getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY*0.0015), e.clientX-r.left, e.clientY-r.top); }, {passive:false});
+const pts = new Map(); let moved = 0, pinch0 = null, downMk = null;
+chart.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('#pop')) return; downMk = e.target.closest ? e.target.closest('.mk') : null;
+  chart.setPointerCapture(e.pointerId); pts.set(e.pointerId, {x:e.clientX, y:e.clientY}); moved = 0;
+  if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = {d:Math.hypot(a.x-b.x, a.y-b.y), s:view.s}; } chart.classList.add('dragging'); });
+chart.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) return; const p = pts.get(e.pointerId); const dx = e.clientX-p.x, dy = e.clientY-p.y; pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (pts.size === 2 && pinch0) { const [a, b] = [...pts.values()]; const r = chart.getBoundingClientRect();
+    zoomAt(pinch0.s*Math.hypot(a.x-b.x, a.y-b.y)/pinch0.d/view.s, (a.x+b.x)/2-r.left, (a.y+b.y)/2-r.top); moved += 10; return; }
+  moved += Math.abs(dx)+Math.abs(dy); view.tx += dx; view.ty += dy; applyView(); });
+chart.addEventListener('pointermove', e => { if (pts.size) return; const id = nearestMarker(e.clientX, e.clientY);
+  if (id !== hover) { hover = id; chart.style.cursor = id ? 'pointer' : ''; labels(); } });
+chart.addEventListener('pointerleave', () => { if (hover) { hover = null; labels(); } });
+const endPtr = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; if (!pts.size) chart.classList.remove('dragging'); };
+chart.addEventListener('pointerup', e => { if (!pts.has(e.pointerId)) return; const tapped = moved < 6 && pts.size <= 1; endPtr(e);
+  if (tapped) { const id = nearestMarker(e.clientX, e.clientY); if (id) openPop(id); else closePop(); } downMk = null; });
+// the place closest to where you clicked, within a finger's width: markers sit close together in Europe
+function nearestMarker(cx, cy) {
+  const r = chart.getBoundingClientRect(); const x = (cx - r.left - view.tx)/view.s, y = (cy - r.top - view.ty)/view.s;
+  let best = null, bd = Math.max(14, 22*Math.min(1, chart.clientWidth/1300))/view.s;
+  const big = view.s > minScale()*1.8, on = new Set(stops.map(st => st.id));
+  P.forEach(p => { if (p.minor && !big && !on.has(p.id)) return; const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = p.id; } });
+  return best;
+}
+chart.addEventListener('pointercancel', e => { downMk = null; endPtr(e); });
+window.addEventListener('resize', () => { if (!touched) fitAll(); else applyView(); });
+
+// ------------------------------------------------------------------ markers
+const NS = 'http://www.w3.org/2000/svg';
+const roadLayer = document.createElementNS(NS, 'g'); ov.appendChild(roadLayer);
+const routeLayer = document.createElementNS(NS, 'g'); ov.appendChild(routeLayer);
+const mkLayer = document.createElementNS(NS, 'g'); ov.appendChild(mkLayer);
+function addMarker(p) {
+  const g = document.createElementNS(NS, 'g'); g.classList.add('mk'); g.dataset.x = p.x; g.dataset.y = p.y; g.dataset.id = p.id;
+  g.setAttribute('tabindex', '0'); g.setAttribute('role', 'button'); g.setAttribute('aria-label', p.name);
+  g.innerHTML = `<circle class="hit" r="24"/><text class="glyph">${p.site ? '†' : '*'}</text><text class="lb" x="20" y="6"></text>`; g.querySelector('.lb').textContent = p.name;
+  g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPop(p.id); } });
+  mkLayer.appendChild(g);
+}
+let hover = null, popId = null;
+P.forEach(addMarker);
+// names on the map: always for From and To, for whatever is hovered or clicked, and for the whole route once zoomed in
+function labels() {
+  const zoomed = view.s > minScale()*2.2, on = new Set(stops.map(st => st.id));
+  mkLayer.querySelectorAll('.mk').forEach(g => { const id = g.dataset.id;
+    const end = id === state.from || id === state.to;
+    g.classList.toggle('end', end);
+    g.style.display = byId[id] && byId[id].minor && !end && !on.has(id) && !(view.s > minScale()*1.8) ? 'none' : '';
+    g.classList.toggle('show', end || id === hover || id === popId || (zoomed && on.has(id))); });
+  const top = mkLayer.querySelector(`.mk[data-id="${CSS.escape(popId || hover || '')}"]`); if (top) mkLayer.appendChild(top);
+  // when start and end sit close together, the start name goes to the left so the two names don't cover each other
+  const lbOf = id => mkLayer.querySelector(`.mk[data-id="${CSS.escape(id || '')}"] .lb`), lf = lbOf(state.from), lt = lbOf(state.to);
+  if (lf) { lf.setAttribute('x', 20); lf.style.textAnchor = ''; }
+  if (lf && lt) { const a = lf.getBoundingClientRect(), b = lt.getBoundingClientRect();
+    if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) { lf.setAttribute('x', -20); lf.style.textAnchor = 'end'; } }
+}
+function openPop(id) {
+  popId = id; $('#popName').textContent = byId[id].name; $('#popNote').textContent = NOTES[id] || ''; $('#popNote').hidden = !NOTES[id];
+  $('#popFrom').disabled = state.from === id; $('#popTo').disabled = state.to === id;
+  $('#popFrom').classList.toggle('next', !state.from); $('#popTo').classList.toggle('next', !!state.from && !state.to);
+  $('#pop').hidden = false; labels(); placePop();
+}
+function closePop() { popId = null; $('#pop').hidden = true; labels(); }
+function placePop() {
+  if (!popId || !byId[popId]) return; const p = byId[popId], pop = $('#pop');
+  const x = view.tx + p.x*view.s, y = view.ty + p.y*view.s, w = chart.clientWidth, pw = pop.offsetWidth/2;
+  pop.style.left = Math.max(pw + 8, Math.min(w - pw - 8, x)) + 'px'; pop.style.top = y + 'px';
+  pop.style.transform = y - pop.offsetHeight - 30 < 0 ? 'translate(-50%, 22px)' : '';
+}
+function choose(k, id) { state[k] = id; closePop(); pruneToday(); stopWalk(); render(); }
+$('#popFrom').onclick = () => choose('from', popId);
+$('#popTo').onclick = () => choose('to', popId);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop(); });
+
+// ------------------------------------------------------------------ typed places
+const norm = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+// modern names people may type
+const ALIAS = {cairo:'babilonia', 'babylon':'babilonia', beijing:'khanbaliq', peking:'khanbaliq', istanbul:'costantinoble', byzantium:'costantinoble',
+  dubrovnik:'ragusa', hangzhou:'cansay', quanzhou:'zaiton', lisboa:'lisboa', sevilla:'sevilla', koln:'koln', venezia:'venezia', roma:'roma', firenze:'firenze',
+  napoli:'napoli', milano:'milano', genova:'genova', akko:'acre', 'tel aviv':'jaffa', jaffa:'jaffa', zaragoza:'zaragoza', fes:'fes', marrakech:'marrakech',
+  heraklion:'candia', 'st catherine':'sinai', akka:'acre', compostela:'santiago', 'santiago':'santiago', kaaba:'mecca', makkah:'mecca', madinah:'medina',
+  'noahs ark':'ararat', ararat:'ararat', niani:'mali', tombouctou:'timbuktu', delhi:'delhi', khambhat:'cambay', mongolia:'karakorum', zhangye:'ganzhou', hotan:'khotan'};
+// cities of today (GeoNames, 15,000+ people), placed on the atlas from the atlas cities around them
+let CITIES = [];
+const citiesReady = fetch('cities.json').then(r => r.json()).then(d => { CITIES = d.map(c => ({n:c[0], k:norm(c[0]), lat:c[1], lon:c[2]})); }).catch(() => {});
+const atlasPlaces = P.slice();
+// extra fixed points read off the atlas's northern drawings, used only to place cities of today
+const ANCHORS = [
+  {lat:60.39, lon:5.32, x:1010, y:160}, {lat:59.91, lon:10.75, x:1110, y:160}, {lat:59.33, lon:18.07, x:1430, y:90},
+  {lat:54.18, lon:15.58, x:1410, y:330}, {lat:53.43, lon:14.55, x:1400, y:410}, {lat:50.06, lon:19.94, x:2110, y:430},
+  {lat:50.45, lon:30.52, x:2630, y:260}, {lat:47.10, lon:39.42, x:3110, y:410}, {lat:48.70, lon:45.00, x:3470, y:310},
+];
+const controls = atlasPlaces.concat(ANCHORS);
+function near(lat, lon, n) { return atlasPlaces.filter(p => !p.terminal).map(p => ({p, d:km({lat, lon}, p)})).sort((a, b) => a.d - b.d).slice(0, n); }
+function toAtlas(lat, lon) {
+  // weighted least-squares fit of x and y to lon/lat over the nearest atlas cities: follows the atlas's own distortions
+  const pts = controls.map(p => ({p, d:km({lat, lon}, p)})).sort((a, b) => a.d - b.d).slice(0, 6);
+  if (pts[0].d < 1) return {x:pts[0].p.x, y:pts[0].p.y};
+  const fit = key => { const A = [[0,0,0],[0,0,0],[0,0,0]], b = [0,0,0];
+    const w0 = 1/(pts[0].d*pts[0].d + 2500);
+    pts.forEach(({p, d}) => { const w = 1/(d*d + 2500)/w0, v = [p.lon - lon, p.lat - lat, 1];
+      for (let i = 0; i < 3; i++) { b[i] += w*v[i]*p[key]; for (let j = 0; j < 3; j++) A[i][j] += w*v[i]*v[j]; } });
+    const det = m => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+    const D = det(A); if (!D || !isFinite(D)) return null;
+    const c = [0,1,2].map(i => det(A.map((r, ri) => r.map((v, ci) => ci === i ? b[ri] : v)))/D);
+    return c[2]; };
+  let x = fit('x'), y = fit('y');
+  if (x == null || y == null) { x = pts[0].p.x; y = pts[0].p.y; }
+  return {x:Math.max(20, Math.min(W-20, x)), y:Math.max(30, Math.min(H-20, y))};
+}
+function addToday(c) {
+  const id = 'today:' + c.k + ':' + c.lat;
+  if (byId[id]) return byId[id];
+  const p = {id, name:c.n, lat:c.lat, lon:c.lon, today:true, terminal:true, ...toAtlas(c.lat, c.lon)};
+  P.push(p); byId[id] = p; adj[id] = [];
+  const ns = near(c.lat, c.lon, 2); regionOf[id] = regionOf[ns[0].p.id];
+  ns.forEach(({p:q}) => { const d = km(p, q)*FACTOR.r, t = d/KM_PER_DAY;
+    adj[id].push({to:q.id, m:'r', km:d, days:t}); adj[q.id].push({to:id, m:'r', km:d, days:t}); });
+  addMarker(p); return p;
+}
+
+// sites of interest across the whole atlas; those not drawn on it are placed from the atlas cities around them
+const SITES = [
+  ['giza','Pyramids of Giza',29.98,31.13,{x:2925,y:1585}], ['kairouan','Great Mosque of Kairouan',35.68,10.10], ['djenne','Great Mosque of Djenné',13.91,-4.55],
+  ['petra','Petra',30.33,35.44], ['najaf','Shrine of Ali, Najaf',32.00,44.33], ['ctesiphon','Arch of Ctesiphon',33.09,44.58,{x:3475,y:1380}],
+  ['persepolis','Persepolis',29.93,52.89], ['mashhad','Shrine of Imam Reza, Mashhad',36.29,59.60], ['bamiyan','Buddhas of Bamiyan',34.83,67.83],
+  ['bodhgaya','Bodh Gaya',24.69,84.99], ['varanasi','Varanasi',25.32,83.01], ['kailash','Mount Kailash',31.07,81.31],
+  ['mogao','Mogao Caves, Dunhuang',40.04,94.80], ['jiayuguan','Great Wall at Jiayuguan',39.80,98.21], ['taishan','Mount Tai',36.25,117.10],
+];
+// places from the period: books and manuscripts, churches, monasteries, mosques, temples, universities, libraries
+const MORE = [
+  ['kells','Book of Kells, Kells Abbey',53.73,-6.88,'A gospel book made around 800, kept here.'],
+  ['runnymede','Magna Carta, Runnymede',51.44,-0.56,'King John agrees to the charter here in 1215.'],
+  ['hereford','Hereford Mappa Mundi',52.05,-2.72,'A world map drawn around 1300.'],
+  ['ebstorf','Ebstorf Map',53.03,10.41,'A world map on 30 goatskins, made in the 1200s.'],
+  ['podlazice','Codex Gigas, Podlažice',49.88,16.00,'The largest medieval manuscript, written here in the early 1200s.'],
+  ['benediktbeuern','Carmina Burana, Benediktbeuern',47.71,11.40,'A book of songs from around 1230, later found in this abbey.'],
+  ['passau','Nibelungenlied, Passau',48.57,13.43,'The epic is written down around 1200, probably near here.'],
+  ['haeinsa','Tripitaka Koreana, Haeinsa',35.80,128.10,'Buddhist scriptures carved on 81,000 wooden blocks, 1237–1248.'],
+  ['konya','Rumi, Konya',37.87,32.48,'Rumi writes the Masnavi here, 1258–1273.'],
+  ['maragheh','Maragheh Observatory',37.39,46.24,'Al-Tusi’s observatory and library, founded in 1259.'],
+  ['salamanca','University of Salamanca',40.96,-5.66,'Founded in 1218.'],
+  ['bologna','University of Bologna',44.49,11.34,'The oldest university, teaching since 1088.'],
+  ['padua','University of Padua',45.41,11.88,'Founded in 1222.'],
+  ['oxford','University of Oxford',51.75,-1.26,'Teaching here since the 1100s.'],
+  ['cambridge','University of Cambridge',52.20,0.12,'Founded in 1209 by scholars leaving Oxford.'],
+  ['nalanda','Nalanda',25.14,85.44,'A great Buddhist university and library, destroyed around 1200.'],
+  ['sakya','Sakya Monastery',28.90,88.02,'Its abbot, Sakya Pandita, meets the Mongols in 1247.'],
+  ['shangdu','Xanadu',42.36,116.18,'Kublai Khan’s summer capital, built in 1256.'],
+  ['kaifeng','Iron Pagoda, Kaifeng',34.80,114.31,'Song capital until 1127. The pagoda is built in 1049.'],
+  ['longmen','Longmen Grottoes',34.56,112.47,'Thousands of Buddhas carved in the cliffs, 400s–700s.'],
+  ['yungang','Yungang Grottoes',40.11,113.12,'51,000 Buddhas carved in the 400s.'],
+  ['shaolin','Shaolin Monastery',34.51,112.94,'A Buddhist monastery from the 400s.'],
+  ['bezeklik','Bezeklik Caves, Turfan',42.95,89.54,'Painted Buddhist caves of the Uyghurs.'],
+  ['jokhang','Jokhang Temple, Lhasa',29.65,91.13,'Tibet’s holiest temple, from the 600s.'],
+  ['taull','Sant Climent de Taüll',42.52,0.85,'Romanesque church, 1123, with a painted Christ in its apse.'],
+  ['ripoll','Santa Maria de Ripoll',42.20,2.19,'Monastery with a carved Romanesque portal and a great library.'],
+  ['silos','Santo Domingo de Silos',41.96,-3.42,'Romanesque cloister. Its monks finish the Silos Apocalypse in 1109.'],
+  ['penya','San Juan de la Peña',42.51,-0.67,'Monastery built under a cliff.'],
+  ['cordoba','Great Mosque of Córdoba',37.88,-4.78,'Built from 785. Made a cathedral in 1236.'],
+  ['cluny','Cluny Abbey',46.43,4.66,'The largest church in Christendom.'],
+  ['vezelay','Vézelay Abbey',47.47,3.75,'Romanesque basilica with a carved tympanum, about 1130.'],
+  ['moissac','Moissac Abbey',44.10,1.08,'Romanesque cloister finished in 1100.'],
+  ['conques','Conques Abbey',44.60,2.40,'Romanesque church with a Last Judgement over its door.'],
+  ['autun','Autun Cathedral',46.95,4.30,'Gislebertus carves the Last Judgement here, about 1130.'],
+  ['fontenay','Fontenay Abbey',47.64,4.39,'A plain Cistercian abbey from 1118.'],
+  ['chartres','Chartres Cathedral',48.45,1.49,'Rebuilt 1194–1220, with its stained glass.'],
+  ['reims','Reims Cathedral',49.25,4.03,'Begun in 1211. Kings of France are crowned here.'],
+  ['amiens','Amiens Cathedral',49.89,2.30,'Begun in 1220.'],
+  ['durham','Durham Cathedral',54.77,-1.58,'Romanesque, built 1093–1133.'],
+  ['salisbury','Salisbury Cathedral',51.07,-1.80,'Built 1220–1258.'],
+  ['speyer','Speyer Cathedral',49.32,8.44,'The largest Romanesque church, from 1061.'],
+  ['marialaach','Maria Laach Abbey',50.40,7.25,'Romanesque abbey on a lake.'],
+  ['bamberg','Bamberg Cathedral',49.89,10.89,'Its stone horseman, the Bamberg Rider, is carved around 1230.'],
+  ['naumburg','Naumburg Cathedral',51.15,11.81,'Stone figures of its founders, around 1250.'],
+  ['lund','Lund Cathedral',55.70,13.19,'Romanesque, consecrated in 1145.'],
+  ['urnes','Urnes Stave Church',61.30,7.32,'Wooden church from about 1130.'],
+  ['gniezno','Gniezno Cathedral',52.54,17.60,'Bronze doors from the 1100s.'],
+  ['monreale','Monreale Cathedral',38.08,13.29,'Covered in gold mosaics, 1180s.'],
+  ['palatina','Palatine Chapel, Palermo',38.12,13.36,'Byzantine mosaics under an Islamic wooden ceiling, 1140s.'],
+  ['casteldelmonte','Castel del Monte',41.08,16.27,'Frederick II’s eight-sided castle, 1240s.'],
+  ['assisi','Basilica of Saint Francis, Assisi',43.07,12.61,'Built 1228–1253. Its walls are painted in the 1290s.'],
+  ['montecassino','Monte Cassino',41.49,13.81,'Benedict’s abbey, founded in 529.'],
+  ['athos','Mount Athos',40.16,24.33,'A peninsula of Orthodox monasteries and libraries.'],
+  ['mystras','Mystras',37.07,22.37,'A Byzantine city founded in 1249.'],
+  ['studenica','Studenica Monastery',43.49,20.53,'Serbian monastery from 1190, with painted walls.'],
+  ['kyiv','Kyiv',50.45,30.51,'Built in 1037. The Mongols sack Kyiv in 1240.'],
+  ['vladimir','Vladimir',56.13,40.40,'White stone carved all over, 1190s.'],
+  ['gelati','Gelati Monastery',42.29,42.77,'A Georgian monastery and academy from 1106.'],
+  ['ani','Ani',40.51,43.57,'The Armenian city of a thousand churches, sacked by the Mongols in 1236.'],
+  ['geghard','Geghard Monastery',40.14,44.82,'Churches cut into the rock, 1215.'],
+  ['goreme','Göreme',38.64,34.83,'Painted churches cut into the rock.'],
+  ['krak','Krak des Chevaliers',34.76,36.29,'Crusader castle, taken by Baybars in 1271.'],
+  ['aleppo','Citadel of Aleppo',36.20,37.16,'Rebuilt around 1200.'],
+  ['isfahan','Friday Mosque, Isfahan',32.67,51.68,'Brick domes from the 1080s.'],
+  ['merv','Merv',37.66,62.19,'One of the largest cities in the world, destroyed by the Mongols in 1221.'],
+  ['herat','Friday Mosque, Herat',34.35,62.19,'Rebuilt in 1200.'],
+  ['jam','Minaret of Jam',34.40,64.52,'A brick minaret 65 metres high, around 1190.'],
+  ['sanaa','Great Mosque of Sanaa',15.35,44.21,'One of the oldest mosques.'],
+  ['konark','Konark Sun Temple',19.89,86.09,'A temple built as a giant chariot, about 1250.'],
+  ['khajuraho','Khajuraho',24.85,79.92,'Carved Hindu and Jain temples, 900s–1000s.'],
+  ['ellora','Ellora Caves',20.02,75.18,'Hindu, Buddhist and Jain temples cut into the rock.'],
+  ['somnath','Somnath',20.89,70.40,'Temple sacked in 1026 and rebuilt.'],
+  ['dilwara','Dilwara Temples, Mount Abu',24.59,72.71,'Jain temples in white marble, 1031 and 1230.'],
+];
+// notes for places already on the map
+const NOTES = {
+  santiago:'The Codex Calixtinus, a pilgrim’s guide, is kept here. Master Mateo finishes the Pórtico da Gloria in 1188.',
+  leon:'San Isidoro has Romanesque wall paintings from the 1100s. The cathedral is begun in 1255.',
+  burgos:'The cathedral is begun in 1221.',
+  toledo:'Scholars translate Arabic books into Latin and Castilian here.',
+  sevilla:'The Giralda minaret is finished in 1198. Alfonso X’s court makes the Cantigas de Santa Maria, 1270s–1280s.',
+  granada:'The Alhambra is begun in 1238.',
+  paris:'The Sainte-Chapelle is finished in 1248. Notre-Dame is finished around 1260. Its university teaches theology.',
+  toulouse:'Saint-Sernin is one of the largest Romanesque churches. The university is founded in 1229.',
+  montpellier:'Its school of medicine gets statutes in 1220.',
+  canterbury:'Thomas Becket’s shrine is set up in the cathedral in 1220.',
+  london:'Westminster Abbey is rebuilt from 1245.',
+  york:'York Minster’s Gothic rebuilding begins around 1220.',
+  edinburgh:'Saint Margaret’s Chapel, built around 1130.',
+  bruges:'The belfry is begun in 1240.',
+  aachen:'Charlemagne’s chapel, built around 800.',
+  koln:'The cathedral is begun in 1248.',
+  prague:'The Old-New Synagogue is built around 1270.',
+  milano:'Sant’Ambrogio, a Romanesque basilica.',
+  genova:'Marco Polo dictates his Travels in a prison here in 1298.',
+  pisa:'The bell tower, begun in 1173, already leans.',
+  firenze:'Dante is born here in 1265.',
+  siena:'The cathedral is built here, 1215–1263.',
+  roma:'Old Saint Peter’s holds the tomb of the apostle.',
+  napoli:'Frederick II founds the university in 1224.',
+  bari:'San Nicola, a Romanesque basilica, holds the bones of Saint Nicholas.',
+  venezia:'Marco Polo leaves for China in 1271. San Marco’s mosaics are made in the 1200s.',
+  costantinoble:'Hagia Sophia, built in 537. Crusaders sack the city in 1204 and carry off its relics.',
+  damasc:'The Umayyad Mosque, built in 715. Ibn Arabi dies here in 1240.',
+  jerusalem:'The Dome of the Rock, built in 691, and the Church of the Holy Sepulchre.',
+  acre:'Capital of the crusader kingdom. It falls in 1291.',
+  babilonia:'Cairo. Al-Azhar, a mosque and school since the 970s. Sultan Qalawun builds a hospital here in 1284.',
+  alexandria:'The great lighthouse still stands, damaged by earthquakes.',
+  fes:'Al-Qarawiyyin, a mosque and school founded in 859, with its library.',
+  marrakech:'The Kutubiyya Mosque is named after the booksellers who worked around it.',
+  tunis:'The Zaytuna Mosque, a center of learning.',
+  tlemcen:'The Great Mosque, rebuilt in 1136.',
+  timbuktu:'A trading town on the Niger, growing under the Mali Empire.',
+  mali:'Sundiata Keita founds the Mali Empire around 1235. Its charter, the Kouroukan Fouga, follows in 1236.',
+  gao:'Capital of the Songhai, on the Niger.',
+  baghdad:'The Mustansiriya madrasa opens in 1233. Al-Wasiti paints the Maqamat of al-Hariri here in 1237. The Mongols sack the city and its libraries in 1258.',
+  tabriz:'Capital of the Mongol Ilkhans from 1265.',
+  shiraz:'Saadi writes the Gulistan here in 1258.',
+  bukhara:'The Kalyan Minaret, built in 1127, survives the Mongols in 1220.',
+  samarkand:'The Mongols destroy the old city in 1220.',
+  delhi:'The Qutb Minar is begun in 1199.',
+  karakorum:'Mongol capital from 1235. William of Rubruck visits in 1254.',
+  khanbaliq:'Beijing. Kublai Khan builds the city from 1267. Marco Polo reaches his court in 1275.',
+  cansay:'Hangzhou. The largest city in the world. Song capital until 1276.',
+  zaiton:'Quanzhou. The world’s busiest port. Marco Polo sails home from here in 1291.',
+  msm:'Abbey on a tidal island. La Merveille is built 1211–1228.',
+  bethlehem:'The Church of the Nativity.',
+  sinai:'Saint Catherine’s Monastery, from the 500s, holds one of the oldest libraries.',
+  mecca:'The Kaaba.',
+  medina:'The Prophet’s Mosque.',
+  ararat:'Where Noah’s Ark is said to have landed.',
+  giza:'Built 3,800 years before this map was made.',
+  kairouan:'Built in the 800s, with one of the oldest minarets.',
+  djenne:'First built in the 1200s, of mud brick.',
+  petra:'Rock-cut city of the Nabataeans, long abandoned.',
+  najaf:'Shrine of Ali, cousin of the Prophet.',
+  ctesiphon:'Persian palace arch from the 500s.',
+  persepolis:'Ruined Persian palace, about 1,800 years old.',
+  mashhad:'Shrine of the eighth imam.',
+  bamiyan:'Two giant Buddhas, carved in the 500s.',
+  bodhgaya:'Where the Buddha found enlightenment. The Mahabodhi Temple.',
+  varanasi:'Holy city on the Ganges.',
+  kailash:'Holy mountain for Hindus, Buddhists and Jains.',
+  mogao:'Over 400 painted caves. A library cave, sealed around 1000, holds thousands of manuscripts.',
+  jiayuguan:'The western end of the Great Wall. The fort here comes later, in 1372.',
+  taishan:'Holy mountain where emperors made sacrifices.',
+};
+MORE.push(
+  ['lindisfarne','Lindisfarne',55.67,-1.80,'Island monastery. Its gospel book was made around 715.'],
+  ['iona','Iona Abbey',56.33,-6.39,'Monastery founded by Columba in 563.'],
+  ['glastonbury','Glastonbury Abbey',51.15,-2.71,'Its monks say they find King Arthur’s grave here in 1191.'],
+  ['stonehenge','Stonehenge',51.18,-1.83,'A stone circle built about 4,500 years ago.'],
+  ['hadrianswall','Hadrian’s Wall',55.00,-2.30,'Roman wall across Britain, begun in 122.'],
+  ['clonmacnoise','Clonmacnoise',53.33,-7.99,'Irish monastery and school on the Shannon.'],
+  ['saintdenis','Saint-Denis Abbey',48.94,2.36,'Gothic architecture begins here in 1144. Kings of France are buried here.'],
+  ['albi','Albi Cathedral',43.93,2.15,'A brick fortress-cathedral, begun in 1282.'],
+  ['carcassonne','Carcassonne',43.21,2.36,'Walled city, taken in the Albigensian Crusade in 1209.'],
+  ['montsegur','Montségur',42.88,1.83,'Last Cathar castle. It falls in 1244.'],
+  ['avignonbridge','Pont Saint-Bénézet, Avignon',43.95,4.80,'Bridge over the Rhône, built 1177–1185.'],
+  ['pontdugard','Pont du Gard',43.95,4.54,'Roman aqueduct bridge.'],
+  ['saintgilles','Saint-Gilles Abbey',43.68,4.43,'Carved Romanesque facade, 1100s.'],
+  ['fontevraud','Fontevraud Abbey',47.18,0.05,'Eleanor of Aquitaine is buried here in 1204.'],
+  ['clairvaux','Clairvaux Abbey',48.15,4.79,'Bernard’s Cistercian abbey, founded in 1115.'],
+  ['citeaux','Cîteaux Abbey',47.13,5.09,'The first Cistercian abbey, founded in 1098.'],
+  ['hildesheim','Saint Michael’s, Hildesheim',52.15,9.95,'Romanesque church with bronze doors, about 1015.'],
+  ['quedlinburg','Quedlinburg Abbey',51.79,11.15,'Romanesque abbey church on a hill.'],
+  ['wartburg','Wartburg Castle',50.97,10.31,'Where poets hold a singing contest, about 1207.'],
+  ['malbork','Malbork Castle',54.04,19.03,'Castle of the Teutonic Knights, begun in 1274.'],
+  ['visby','Visby',57.64,18.30,'Walled Hanseatic town on Gotland.'],
+  ['uppsala','Uppsala Cathedral',59.86,17.64,'Begun around 1270.'],
+  ['roskilde','Roskilde Cathedral',55.64,12.08,'Brick cathedral, begun in the 1170s.'],
+  ['ribe','Ribe Cathedral',55.33,8.76,'In Denmark’s oldest town.'],
+  ['avila','Walls of Ávila',40.66,-4.70,'Town walls built from the 1090s.'],
+  ['segovia','Aqueduct of Segovia',40.95,-4.12,'Roman aqueduct, still carrying water.'],
+  ['poblet','Poblet Monastery',41.38,1.08,'Cistercian monastery with the tombs of the kings of Aragon.'],
+  ['montserrat','Montserrat',41.59,1.84,'Monastery of the Black Virgin on a jagged mountain.'],
+  ['covadonga','Covadonga',43.31,-5.06,'Where the Christian kingdoms of Spain begin, in 722.'],
+  ['oviedo','Holy Chamber, Oviedo',43.36,-5.85,'Relics that start the first road to Santiago.'],
+  ['alcobaca','Alcobaça Monastery',39.55,-8.98,'Cistercian monastery, founded in 1178.'],
+  ['sangimignano','San Gimignano',43.47,11.04,'A town of tall towers, built in the 1200s.'],
+  ['orvieto','Orvieto Cathedral',42.72,12.11,'Begun in 1290.'],
+  ['matera','Matera',40.67,16.60,'Cave houses and rock churches.'],
+  ['amalfi','Amalfi',40.63,14.60,'Sea republic. Its cathedral has bronze doors from Constantinople.'],
+  ['salerno','School of Salerno',40.68,14.77,'The first medical school in Europe.'],
+  ['bobbio','Bobbio Abbey',44.77,9.38,'Founded by Columbanus in 614. Its library is full of manuscripts.'],
+  ['pompeii','Pompeii',40.75,14.49,'Roman town buried in 79, still hidden under the ash.'],
+  ['hosiosloukas','Hosios Loukas',38.39,22.75,'Byzantine monastery with gold mosaics, 1000s.'],
+  ['athens','Parthenon, Athens',37.97,23.73,'The ancient temple is now a church of the Virgin.'],
+  ['rila','Rila Monastery',42.13,23.34,'Bulgarian monastery from the 900s.'],
+  ['sopocani','Sopoćani Monastery',43.11,20.39,'Serbian monastery with frescoes, 1260s.'],
+  ['split','Diocletian’s Palace, Split',43.51,16.44,'A Roman emperor’s palace with a town built inside it.'],
+  ['ephesus','Ephesus',37.94,27.34,'Ruined Roman city and the Basilica of Saint John.'],
+  ['troy','Troy',39.96,26.24,'The ruins of Troy.'],
+  ['divrigi','Divriği Great Mosque',39.37,38.11,'Mosque and hospital with carved stone doors, 1229.'],
+  ['sultanhani','Sultanhanı Caravanserai',38.25,33.55,'An inn for Silk Road caravans, 1229.'],
+  ['nemrut','Mount Nemrut',37.98,38.74,'Giant stone heads on a king’s tomb.'],
+  ['akdamar','Akdamar Church',38.34,43.03,'Armenian church on an island in Lake Van, 915.'],
+  ['baalbek','Baalbek',34.01,36.21,'Huge Roman temples, now a fortress.'],
+  ['palmyra','Palmyra',34.55,38.27,'Ruined caravan city in the desert.'],
+  ['jerash','Jerash',32.28,35.89,'Roman city with columned streets.'],
+  ['samarra','Samarra',34.20,43.87,'Spiral minaret of the Great Mosque, 852.'],
+  ['babylon','Babylon',32.54,44.42,'The ruins of Babylon.'],
+  ['ur','Ur',30.96,46.10,'The ziggurat of Ur, over 4,000 years old.'],
+  ['karbala','Karbala',32.62,44.03,'Shrine of Husayn, grandson of the Prophet.'],
+  ['alamut','Alamut Castle',36.44,50.59,'Castle and library of the Nizari Ismailis, taken by the Mongols in 1256.'],
+  ['pasargadae','Pasargadae',30.20,53.18,'Tomb of Cyrus the Great.'],
+  ['bam','Citadel of Bam',29.12,58.37,'A mud-brick citadel on the caravan road.'],
+  ['abusimbel','Abu Simbel',22.34,31.63,'Temples of Ramesses II, half buried in sand.'],
+  ['karnak','Karnak, Thebes',25.72,32.66,'Temples of ancient Thebes.'],
+  ['stanthony','Saint Anthony’s Monastery',28.92,32.35,'One of the oldest monasteries, from the 300s.'],
+  ['leptis','Leptis Magna',32.64,14.29,'Roman city under the sand.'],
+  ['carthage','Carthage',36.85,10.33,'The ruins of Carthage.'],
+  ['volubilis','Volubilis',34.07,-5.55,'Roman town ruins.'],
+  ['tinmel','Tinmel Mosque',30.98,-8.23,'Almohad mosque in the mountains, 1153.'],
+  ['chinguetti','Chinguetti',20.46,-12.36,'Desert town founded in the 1200s, later known for its libraries.'],
+  ['koumbisaleh','Koumbi Saleh',15.76,-8.00,'Capital of the old empire of Ghana.'],
+  ['otrar','Otrar',42.85,68.30,'Its governor kills Mongol envoys in 1218. The Mongols destroy it in 1219.'],
+  ['taxila','Taxila',33.75,72.82,'Ruined Buddhist university city.'],
+  ['sanchi','Sanchi',23.48,77.74,'The Great Stupa, built over 1,400 years before.'],
+  ['ajanta','Ajanta Caves',20.55,75.70,'Painted Buddhist caves.'],
+  ['chittor','Chittorgarh',24.89,74.65,'Rajput hill fortress.'],
+  ['multan','Multan',30.20,71.47,'City of Sufi shrines and an old sun temple.'],
+  ['lumbini','Lumbini',27.47,83.28,'Birthplace of the Buddha.'],
+  ['samye','Samye Monastery',29.33,91.50,'Tibet’s first monastery, 779.'],
+  ['leshan','Leshan Giant Buddha',29.55,103.77,'Carved into a cliff, 713–803.'],
+  ['wutai','Mount Wutai',39.08,113.58,'Holy mountain of the bodhisattva Manjushri.'],
+  ['qufu','Temple of Confucius, Qufu',35.60,116.99,'Confucius’s hometown and temple.'],
+  ['suzhou','Suzhou',31.30,120.62,'A canal city of gardens.'],
+  ['kharakhoto','Khara-Khoto',41.76,101.07,'Tangut city of Black Water. The Mongols take it in 1226.'],
+  ['xixia','Western Xia Tombs',38.43,105.97,'Tombs of the Tangut kings.'],
+  ['burkhan','Burkhan Khaldun',48.76,108.70,'Holy mountain. Genghis Khan is said to be buried near it.'],
+  ['bulguksa','Bulguksa Temple',35.79,129.33,'Buddhist temple from 774.']
+);
+Object.assign(NOTES, {
+  kyiv:'Saint Sophia, built in 1037. The Mongols sack Kyiv in 1240.', vladimir:'Saint Demetrius, carved white stone, 1190s.',
+  lincoln:'One of the four copies of Magna Carta from 1215 is kept here.', trier:'The Roman gate, Porta Nigra.',
+  nimes:'Roman arena and the Maison Carrée temple.', ravenna:'Byzantine mosaics of San Vitale, 547.',
+  ohrid:'Saint Clement’s school, the first of the Slavs.', thessaloniki:'Church of Hagios Demetrios.',
+  nicaea:'Capital of the Byzantines in exile, 1204–1261.', trebizond:'Its own Byzantine empire from 1204.',
+  balkh:'Mother of cities. Rumi is born here in 1207.', ajmer:'Shrine of the Sufi Moinuddin Chishti, who dies in 1236.',
+  xian:'Old Tang capital. The Big Wild Goose Pagoda, 652.', kathmandu:'The Swayambhunath stupa.',
+  nishapur:'Omar Khayyam is buried here, 1131.', kashgar:'Where the Silk Road roads around the desert meet.',
+  turfan:'Oasis city of the Uyghurs.', yangzhou:'Marco Polo says he governed this city.',
+  lubeck:'Head of the Hanseatic League.', vienna:'Romanesque church of Saint Stephen.', krakow:'Rebuilt after the Mongols burn it in 1241.',
+  kufa:'Old capital of the caliphs. The angular Kufic script is named after it.', aswan:'Granite quarries and the first cataract of the Nile.',
+  dongola:'Capital of Christian Nubia.', walata:'Desert market town on the road to Mali.', ghadames:'Oasis town of the Saharan caravans.',
+  antioch:'Capital of a crusader state until 1268.', capua:'Start of the Via Appia’s road south.', aquileia:'Roman port, start of the Amber Road.',
+  gdansk:'End of the Amber Road on the Baltic.', merida:'Roman bridge and theatre.', astorga:'Roman town on the road to Santiago.',
+  lepuy:'Black Virgin on a volcanic rock. Start of the Via Podiensis.', stjean:'Last town before the Pyrenees on the way to Santiago.',
+  dover:'Castle above the cliffs.', susa:'Old Persian capital, end of the Royal Road.', sardis:'Start of the Persian Royal Road.',
+  raqqa:'Harun al-Rashid’s capital, 796–808.', rey:'Old city near modern Tehran, destroyed by the Mongols in 1220.',
+  khujand:'Gateway to the Fergana Valley.', dunhuang:'Oasis at the edge of the desert, by the Mogao caves.',
+  luoyang:'Old capital, near the Longmen caves.', chengdu:'Start of the Tea Horse Road to Tibet.', patna:'Old Pataliputra, capital of ancient India.',
+  peshawar:'At the foot of the Khyber Pass.', gaza:'Where the Incense Route meets the sea.', aqaba:'Port on the Red Sea.', amman:'Roman Philadelphia.',
+});
+
+// towns along the historical roads, placed on the atlas from the atlas cities around them
+const TOWNS = [
+  ['capua','Capua',41.10,14.21],['benevento','Benevento',41.13,14.78],['taranto','Taranto',40.47,17.24],['rimini','Rimini',44.06,12.57],
+  ['ravenna','Ravenna',44.42,12.20],['piacenza','Piacenza',45.05,9.69],['verona','Verona',45.44,10.99],['aquileia','Aquileia',45.77,13.37],
+  ['trento','Trento',46.07,11.12],['bolzano','Bolzano',46.50,11.35],['augsburg','Augsburg',48.37,10.90],['torino','Turin',45.07,7.69],
+  ['briancon','Briançon',44.90,6.64],['nimes','Nîmes',43.84,4.36],['narbonne','Narbonne',43.18,3.00],['girona','Girona',41.98,2.82],
+  ['tarragona','Tarragona',41.12,1.25],['valencia','Valencia',39.47,-0.38],['cadiz','Cádiz',36.53,-6.29],['merida','Mérida',38.92,-6.34],
+  ['astorga','Astorga',42.46,-6.06],['coimbra','Coimbra',40.21,-8.42],['porto','Porto',41.15,-8.61],['orleans','Orléans',47.90,1.91],
+  ['poitiers','Poitiers',46.58,0.34],['lepuy','Le Puy-en-Velay',45.04,3.88],['stjean','Saint-Jean-Pied-de-Port',43.16,-1.24],
+  ['limoges','Limoges',45.83,1.26],['jaca','Jaca',42.57,-0.55],['langres','Langres',47.86,5.33],['boulogne','Boulogne',50.73,1.61],
+  ['metz','Metz',49.12,6.18],['trier','Trier',49.75,6.64],['mainz','Mainz',50.00,8.27],['strasbourg','Strasbourg',48.58,7.75],
+  ['basel','Basel',47.56,7.59],['besancon','Besançon',47.24,6.02],['lausanne','Lausanne',46.52,6.63],['aosta','Aosta',45.74,7.32],
+  ['pavia','Pavia',45.19,9.16],['lucca','Lucca',43.84,10.50],['dover','Dover',51.13,1.31],['stalbans','St Albans',51.75,-0.34],
+  ['wroxeter','Wroxeter',52.67,-2.65],['chester','Chester',53.19,-2.89],['lincoln','Lincoln',53.23,-0.54],['exeter','Exeter',50.72,-3.53],
+  ['bath','Bath',51.38,-2.36],['cirencester','Cirencester',51.72,-1.97],['leicester','Leicester',52.64,-1.13],
+  ['durres','Durrës',41.32,19.45],['ohrid','Ohrid',41.12,20.80],['thessaloniki','Thessaloniki',40.64,22.94],['kavala','Kavala',40.94,24.41],
+  ['belgrade','Belgrade',44.82,20.46],['nis','Niš',43.32,21.90],['sofia','Sofia',42.70,23.32],['plovdiv','Plovdiv',42.14,24.75],
+  ['edirne','Adrianople',41.68,26.56],['ljubljana','Ljubljana',46.05,14.51],['vienna','Vienna',48.21,16.37],['kalisz','Kalisz',51.76,18.09],
+  ['gdansk','Gdańsk',54.35,18.65],['regensburg','Regensburg',49.01,12.10],['budapest','Buda',47.50,19.04],['frankfurt','Frankfurt',50.11,8.68],
+  ['erfurt','Erfurt',50.98,11.03],['leipzig','Leipzig',51.34,12.37],['wroclaw','Wrocław',51.11,17.03],['krakow','Kraków',50.06,19.94],
+  ['dortmund','Dortmund',51.51,7.47],['paderborn','Paderborn',51.72,8.75],['magdeburg','Magdeburg',52.13,11.63],['luneburg','Lüneburg',53.25,10.41],
+  ['hamburg','Hamburg',53.55,9.99],['lubeck','Lübeck',53.87,10.69],['lviv','Lviv',49.84,24.03],['smolensk','Smolensk',54.78,32.05],
+  ['nicaea','Nicaea',40.43,29.72],['dorylaeum','Dorylaeum',39.78,30.52],['tarsus','Tarsus',36.92,34.89],['antioch','Antioch',36.20,36.16],
+  ['sardis','Sardis',38.49,28.04],['ankara','Ankara',39.93,32.86],['kayseri','Kayseri',38.72,35.48],['sivas','Sivas',39.75,37.02],
+  ['erzurum','Erzurum',39.90,41.27],['trebizond','Trebizond',41.00,39.72],['mosul','Mosul',36.34,43.13],['erbil','Erbil',36.19,44.01],
+  ['susa','Susa',32.19,48.26],['raqqa','Raqqa',35.95,39.01],['hamadan','Hamadan',34.80,48.51],['rey','Rey',35.59,51.43],['qazvin','Qazvin',36.27,50.00],
+  ['nishapur','Nishapur',36.21,58.80],['balkh','Balkh',36.76,66.90],['termez','Termez',37.22,67.28],['khujand','Khujand',40.28,69.62],
+  ['kashgar','Kashgar',39.47,75.99],['yarkand','Yarkand',38.42,77.24],['aksu','Aksu',41.17,80.26],['kucha','Kucha',41.72,82.96],
+  ['turfan','Turfan',42.95,89.18],['hami','Hami',42.83,93.51],['dunhuang','Dunhuang',40.14,94.66],['lanzhou','Lanzhou',36.06,103.83],
+  ['xian','Chang’an (Xi’an)',34.34,108.94],['luoyang','Luoyang',34.62,112.45],['yangzhou','Yangzhou',32.39,119.42],['chengdu','Chengdu',30.66,104.06],
+  ['kathmandu','Kathmandu',27.71,85.32],['peshawar','Peshawar',34.01,71.58],['lahore','Lahore',31.55,74.34],['kannauj','Kannauj',27.05,79.92],
+  ['patna','Patna',25.59,85.14],['ajmer','Ajmer',26.45,74.64],['kufa','Kufa',32.03,44.40],['fayd','Fayd',27.11,42.51],['amman','Amman',31.95,35.93],
+  ['tabuk','Tabuk',28.38,36.57],['aqaba','Aqaba',29.53,35.00],['najran','Najran',17.49,44.13],['gaza','Gaza',31.50,34.47],['asyut','Asyut',27.18,31.18],
+  ['aswan','Aswan',24.09,32.90],['dongola','Old Dongola',18.22,30.75],['walata','Walata',17.28,-7.03],['ghadames','Ghadames',30.13,9.50],
+  ['murzuk','Murzuk',25.92,13.92],
+];
+TOWNS.push(
+  ['zamora','Zamora',41.50,-5.75],['madrid','Madrid',40.42,-3.70],['murcia','Murcia',37.98,-1.13],['almeria','Almería',36.84,-2.46],['malaga','Málaga',36.72,-4.42],
+  ['tortosa','Tortosa',40.81,0.52],['lleida','Lleida',41.62,0.62],['badajoz','Badajoz',38.88,-6.97],['braga','Braga',41.55,-8.42],['lugo','Lugo',43.01,-7.56],
+  ['algeciras','Algeciras',36.13,-5.45],['rouen','Rouen',49.44,1.10],['caen','Caen',49.18,-0.37],['rennes','Rennes',48.11,-1.68],['nantes','Nantes',47.22,-1.55],
+  ['angers','Angers',47.47,-0.55],['bourges','Bourges',47.08,2.40],['clermont','Clermont',45.78,3.08],['dijon','Dijon',47.32,5.04],['troyes','Troyes',48.30,4.08],
+  ['provins','Provins',48.56,3.30],['arras','Arras',50.29,2.78],['perigueux','Périgueux',45.18,0.72],['bayonne','Bayonne',43.49,-1.47],
+  ['ghent','Ghent',51.05,3.72],['utrecht','Utrecht',52.09,5.12],['bremen','Bremen',53.08,8.80],['nuremberg','Nuremberg',49.45,11.08],['wurzburg','Würzburg',49.79,9.95],
+  ['zurich','Zurich',47.37,8.54],['constance','Constance',47.66,9.18],['salzburg','Salzburg',47.80,13.04],['stettin','Stettin',53.43,14.55],['riga','Riga',56.95,24.11],
+  ['copenhagen','Copenhagen',55.68,12.57],['bergen','Bergen',60.39,5.32],['oslo','Oslo',59.91,10.75],['stockholm','Stockholm',59.33,18.07],['hedeby','Schleswig',54.49,9.57],
+  ['winchester','Winchester',51.06,-1.31],['bristol','Bristol',51.45,-2.59],['norwich','Norwich',52.63,1.30],['carlisle','Carlisle',54.89,-2.93],
+  ['cork','Cork',51.90,-8.47],['waterford','Waterford',52.26,-7.11],['armagh','Armagh',54.35,-6.65],
+  ['mantua','Mantua',45.16,10.79],['ferrara','Ferrara',44.84,11.62],['perugia','Perugia',43.11,12.39],['spoleto','Spoleto',42.73,12.74],['foggia','Foggia',41.46,15.55],
+  ['reggio','Reggio',38.11,15.65],['messina','Messina',38.19,15.55],['syracuse','Syracuse',37.08,15.29],
+  ['zagreb','Zagreb',45.81,15.98],['skopje','Skopje',42.00,21.43],['tarnovo','Tarnovo',43.08,25.63],['corinth','Corinth',37.94,22.93],['larissa','Larissa',39.64,22.42],
+  ['esztergom','Esztergom',47.79,18.74],['chernihiv','Chernihiv',51.50,31.29],['moscow','Moscow',55.76,37.62],
+  ['smyrna','Smyrna',38.42,27.14],['antalya','Antalya',36.89,30.71],['alanya','Alanya',36.54,32.00],['sinop','Sinop',42.03,35.15],['malatya','Malatya',38.35,38.31],
+  ['diyarbakir','Diyarbakır',37.91,40.24],['van','Van',38.50,43.38],['tbilisi','Tbilisi',41.72,44.79],['derbent','Derbent',42.06,48.29],['baku','Baku',40.41,49.87],
+  ['tripolis','Tripoli (Syria)',34.44,35.83],['beirut','Beirut',33.89,35.50],['tyre','Tyre',33.27,35.20],['homs','Homs',34.73,36.71],['hama','Hama',35.13,36.75],
+  ['edessa','Edessa',37.16,38.79],['harran','Harran',36.86,39.03],['damietta','Damietta',31.42,31.81],['benghazi','Benghazi',32.12,20.07],
+  ['algiers','Algiers',36.75,3.06],['bejaia','Béjaïa',36.75,5.08],['constantine','Constantine',36.37,6.61],['oran','Oran',35.70,-0.63],['ceuta','Ceuta',35.89,-5.32],
+  ['tangier','Tangier',35.76,-5.83],['rabat','Rabat',34.02,-6.84],['tadmekka','Tadmekka',18.75,1.33],['agadez','Agadez',16.97,7.99],
+  ['jeddah','Jeddah',21.49,39.19],['taif','Taif',21.27,40.42],['muscat','Muscat',23.59,58.41],['sohar','Sohar',24.35,56.71],['basra','Basra',30.51,47.81],
+  ['kashan','Kashan',33.99,51.44],['yazd','Yazd',31.90,54.37],['ghazni','Ghazni',33.55,68.42],['kandahar','Kandahar',31.61,65.71],['gorgan','Gorgan',36.84,54.44],
+  ['urgench','Urgench',42.33,59.15],['khiva','Khiva',41.38,60.36],['tashkent','Tashkent',41.30,69.24],['talas','Talas',42.52,72.24],
+  ['gwalior','Gwalior',26.23,78.18],['ujjain','Ujjain',23.18,75.78],['mathura','Mathura',27.49,77.67],['prayag','Prayag',25.44,81.85],['gaur','Gaur',24.87,88.14],
+  ['devagiri','Devagiri',19.94,75.21],['anhilwara','Anhilwara',23.85,72.12],['broach','Broach',21.70,72.98],
+  ['nanjing','Nanjing',32.06,118.80],['wuchang','Wuchang',30.55,114.30],['changsha','Changsha',28.23,112.94],['guangzhou','Guangzhou',23.13,113.26],
+  ['fuzhou','Fuzhou',26.07,119.30],['ningbo','Ningbo',29.87,121.55],['yinchuan','Yinchuan',38.49,106.23],['datong','Datong',40.08,113.30],
+  ['taiyuan','Taiyuan',37.87,112.55],['jinan','Jinan',36.65,117.12],['xiangyang','Xiangyang',32.01,112.12],['liaoyang','Liaoyang',41.27,123.17],['kaesong','Kaesong',37.97,126.55]
+);
+
+TOWNS.push(
+  ['pescara','Pescara',42.46,14.21],['ascoli','Ascoli',42.85,13.58],['nice','Nice',43.70,7.27],['bosra','Bosra',32.52,36.48],
+  ['saintes','Saintes',45.75,-0.63],['chichester','Chichester',50.84,-0.78],['kharga','Kharga',25.44,30.55],['beshbaliq','Beshbaliq',44.0,89.1],
+  ['baotou','Baotou',40.66,109.84],['nanchang','Nanchang',28.68,115.86],['innsbruck','Innsbruck',47.27,11.39],['chambery','Chambéry',45.56,5.92],['jining','Jining',35.41,116.58],['hit','Hit',33.64,42.83]
+);
+Object.assign(NOTES, {bosra:'Roman theatre, turned into a fortress.', saintes:'Roman arch and amphitheatre.', chichester:'Roman town of the south coast.',
+  kharga:'Oasis on the Forty Days Road.', beshbaliq:'Uyghur summer capital.', nice:'Port of Provence.', pescara:'End of the Via Valeria on the Adriatic.'});
+TOWNS.forEach(([id, name, lat, lon]) => {
+  if (byId[id]) return;
+  const ns = near(lat, lon, 1);
+  const p = {id, name, lat, lon, minor:true, ...toAtlas(lat, lon)};
+  P.push(p); byId[id] = p; adj[id] = []; regionOf[id] = regionOf[ns[0].p.id];
+  atlasPlaces.push(p); addMarker(p);
+});
+
+MORE.push(
+  ['goslar','Imperial Palace, Goslar',51.91,10.43,'Palace of the German emperors, near the Rammelsberg silver mines.'],
+  ['lorsch','Lorsch Abbey',49.65,8.57,'Gatehouse from around 800 and a famous library.'],
+  ['reichenau','Reichenau Abbey',47.70,9.06,'Island monastery known for its painted manuscripts.'],
+  ['stgall','Abbey of Saint Gall',47.42,9.38,'Its library holds the plan of an ideal monastery, around 820.'],
+  ['pannonhalma','Pannonhalma Abbey',47.55,17.76,'Benedictine abbey founded in 996.'],
+  ['kutnahora','Kutná Hora',49.95,15.27,'Silver mines from the 1260s.'],
+  ['wieliczka','Wieliczka Salt Mine',49.98,20.06,'Salt mined here from the 1200s.'],
+  ['spis','Spiš Castle',49.00,20.77,'Hilltop castle from the 1100s.'],
+  ['nerl','Church on the Nerl',56.20,40.56,'White stone church in a meadow, 1165.'],
+  ['mileseva','Mileševa Monastery',43.37,19.73,'Its fresco of the White Angel is painted in the 1230s.'],
+  ['zica','Žiča Monastery',43.70,20.65,'Seat of the first Serbian archbishop, 1219.'],
+  ['boyana','Boyana Church',42.65,23.27,'Frescoes painted in 1259.'],
+  ['daphni','Daphni Monastery',38.01,23.64,'Byzantine mosaics, around 1100.'],
+  ['monemvasia','Monemvasia',36.69,23.04,'Fortress town on a rock in the sea.'],
+  ['sanmillan','San Millán de la Cogolla',42.33,-2.86,'Its manuscripts hold the first written Spanish words.'],
+  ['leyre','Leyre Monastery',42.64,-1.17,'Romanesque crypt, burial place of the kings of Navarre.'],
+  ['loarre','Loarre Castle',42.33,-0.62,'Romanesque castle from the 1000s.'],
+  ['rocamadour','Rocamadour',44.80,1.62,'Pilgrim shrine built into a cliff.'],
+  ['thoronet','Le Thoronet Abbey',43.46,6.30,'Plain Cistercian abbey, 1100s.'],
+  ['senanque','Sénanque Abbey',43.93,5.19,'Cistercian abbey in a narrow valley, 1148.'],
+  ['laon','Laon Cathedral',49.56,3.62,'Built 1155–1235, with stone oxen on its towers.'],
+  ['beauvais','Beauvais Cathedral',49.43,2.08,'The tallest Gothic choir. Its vault collapses in 1284.'],
+  ['bayeux','Bayeux Cathedral',49.28,-0.70,'The Bayeux Tapestry is kept here.'],
+  ['saintsavin','Saint-Savin-sur-Gartempe',46.56,0.87,'Romanesque church with painted vaults.'],
+  ['cuxa','Saint-Michel de Cuxa',42.60,2.42,'Romanesque abbey with a carved cloister.'],
+  ['orange','Roman Theatre, Orange',44.14,4.81,'Its great stage wall still stands.'],
+  ['fountains','Fountains Abbey',54.11,-1.58,'Cistercian abbey founded in 1132.'],
+  ['rievaulx','Rievaulx Abbey',54.26,-1.12,'Cistercian abbey founded in 1132.'],
+  ['tintern','Tintern Abbey',51.70,-2.68,'Cistercian abbey by the river Wye, 1131.'],
+  ['wells','Wells Cathedral',51.21,-2.64,'Its west front of carved saints, 1240s.'],
+  ['ely','Ely Cathedral',52.40,0.26,'Romanesque cathedral on an island in the fens.'],
+  ['glendalough','Glendalough',53.01,-6.33,'Monastic city with a round tower.'],
+  ['cashel','Rock of Cashel',52.52,-7.89,'Cormac’s Chapel, 1134, and a cathedral on a rock.'],
+  ['melrose','Melrose Abbey',55.60,-2.72,'Cistercian abbey founded in 1136.'],
+  ['pomposa','Pomposa Abbey',44.83,12.18,'The monk Guido of Arezzo works out musical notation here.'],
+  ['sangalgano','San Galgano',43.15,11.15,'A sword set in a stone, 1180.'],
+  ['cefalu','Cefalù Cathedral',38.04,14.02,'Christ in gold mosaic, 1148.'],
+  ['trani','Trani Cathedral',41.28,16.42,'Romanesque cathedral by the sea.'],
+  ['svetitskhoveli','Svetitskhoveli Cathedral',41.84,44.72,'Georgian cathedral, 1029.'],
+  ['vardzia','Vardzia',41.38,43.28,'Cave monastery of Queen Tamar, 1185.'],
+  ['tatev','Tatev Monastery',39.38,46.25,'Armenian monastery and university.'],
+  ['echmiadzin','Echmiadzin Cathedral',40.16,44.29,'Mother cathedral of Armenia.'],
+  ['hasankeyf','Hasankeyf',37.71,41.41,'Great bridge over the Tigris, 1116.'],
+  ['margat','Margat Castle',35.15,35.95,'Castle of the Knights Hospitaller.'],
+  ['montfort','Montfort Castle',33.04,35.23,'Castle of the Teutonic Knights, taken in 1271.'],
+  ['atlit','Château Pèlerin, Atlit',32.69,34.94,'Templar sea castle built in 1218.'],
+  ['kerak','Kerak Castle',31.18,35.70,'Crusader castle, taken by Saladin in 1188.'],
+  ['shobak','Montréal Castle, Shobak',30.53,35.56,'Crusader castle built in 1115.'],
+  ['qasramra','Qasr Amra',31.80,36.59,'Desert bathhouse with painted walls, 700s.'],
+  ['hebron','Tomb of the Patriarchs, Hebron',31.52,35.11,'Tomb of Abraham.'],
+  ['nazareth','Nazareth',32.70,35.30,'Church of the Annunciation.'],
+  ['hatra','Hatra',35.59,42.72,'Ruined desert city.'],
+  ['lalish','Lalish',36.77,43.30,'Holy valley of the Yazidis. Sheikh Adi dies here in 1162.'],
+  ['takhtsoleyman','Takht-e Soleyman',36.60,47.24,'Old fire temple. The Ilkhans build a palace here in the 1270s.'],
+  ['bisotun','Bisotun',34.39,47.44,'Darius’s inscription carved in the cliff.'],
+  ['gonbad','Gonbad-e Qabus',37.26,55.17,'A brick tomb tower, 1007.'],
+  ['siraf','Siraf',27.67,52.34,'Ruined port of the Gulf trade.'],
+  ['madainsalih','Mada’in Salih',26.79,37.95,'Nabataean tombs cut in the rock.'],
+  ['bahla','Bahla Fort',22.96,57.30,'Mud-brick fort in an Oman oasis.'],
+  ['burana','Burana Tower, Balasagun',42.75,75.25,'Minaret of the Karakhanid city of Balasagun.'],
+  ['jagannath','Jagannath Temple, Puri',19.80,85.82,'Temple built in the 1100s.'],
+  ['lingaraja','Lingaraja Temple',20.24,85.83,'Hindu temple from the 1000s.'],
+  ['ramappa','Ramappa Temple',18.26,79.94,'Kakatiya temple finished in 1213.'],
+  ['modhera','Modhera Sun Temple',23.58,72.13,'Sun temple from 1026.'],
+  ['vikramashila','Vikramashila',25.32,87.28,'Buddhist university, destroyed around 1200.'],
+  ['sarnath','Sarnath',25.38,83.02,'Where the Buddha gave his first sermon.'],
+  ['kushinagar','Kushinagar',26.74,83.89,'Where the Buddha died.'],
+  ['tholing','Tholing Monastery',31.48,79.80,'Monastery of the Guge kingdom, 996.'],
+  ['alchi','Alchi',34.22,77.17,'Painted Buddhist temples, 1000s.'],
+  ['dali','Three Pagodas, Dali',25.61,100.27,'Capital of the Dali kingdom. The Mongols take it in 1253.'],
+  ['hangingtemple','Hanging Temple',39.66,113.71,'Monastery built on a cliff face.'],
+  ['lugou','Lugou Bridge',39.85,116.21,'Stone bridge built in 1192. Marco Polo describes it.'],
+  ['wudang','Wudang Mountains',32.40,111.00,'Taoist holy mountains.'],
+  ['zhaozhou','Zhaozhou Bridge',37.71,114.77,'Stone arch bridge from 605.'],
+  ['monastir','Ribat of Monastir',35.77,10.83,'Fortified Islamic monastery, 796.'],
+  ['dougga','Dougga',36.42,9.22,'Roman town on a hill.'],
+  ['eldjem','El Djem',35.30,10.71,'Roman amphitheatre.'],
+  ['timgad','Timgad',35.48,6.47,'Roman city in ruins.'],
+  ['beniHammad','Qal’at Beni Hammad',35.81,4.79,'Ruined capital with a tall minaret.']
+);
+
+Object.assign(NOTES, {
+  madrid:'A small walled town.', murcia:'Taken by Castile in 1243.', almeria:'Port of silk weaving.', malaga:'Port of the Nasrid kingdom.',
+  lugo:'Its Roman walls still stand.', braga:'Old seat of the Church in Portugal.', rouen:'Capital of Normandy.', caen:'Abbeys founded by William the Conqueror.',
+  angers:'Castle with seventeen towers, built in the 1230s.', bourges:'Cathedral built 1195–1255.', troyes:'Host of the Champagne fairs.',
+  provins:'Host of the Champagne fairs.', ghent:'Cloth town of Flanders.', bremen:'Hanseatic town. The cathedral holds Saint Willehad.',
+  nuremberg:'Imperial castle on the rock.', zurich:'Start of the road over the Gotthard pass, open around 1230.', salzburg:'Prince-archbishops and salt.',
+  riga:'Founded in 1201 by German crusaders.', copenhagen:'Founded by Bishop Absalon around 1167.', bergen:'Capital of Norway.', stockholm:'Founded around 1252.',
+  winchester:'Old royal capital. Its round table is made around 1290.', norwich:'Norman cathedral, 1096.', carlisle:'Border fortress.',
+  armagh:'Saint Patrick’s church.', mantua:'Virgil’s hometown.', ferrara:'Romanesque cathedral, 1135.', perugia:'Hill town of central Italy.',
+  spoleto:'Romanesque cathedral and the Bridge of Towers.', foggia:'Frederick II’s palace.', messina:'Crossing point to Sicily.',
+  syracuse:'Greek temple turned into a cathedral.', tarnovo:'Capital of the Bulgarian empire.', corinth:'Ruins of ancient Corinth.',
+  esztergom:'Royal seat of Hungary.', chernihiv:'Old Rus’ city, sacked in 1239.', moscow:'A small fort town, burned by the Mongols in 1238.',
+  smyrna:'Port on the Aegean.', alanya:'The Red Tower, built by the Seljuks in 1226.', sinop:'Seljuk port on the Black Sea.',
+  diyarbakir:'Black basalt walls.', van:'Fortress on the lake.', tbilisi:'Capital of Georgia, sacked in 1226.', derbent:'Caspian Gates, a wall from the sea to the mountains.',
+  baku:'The Maiden Tower.', tripolis:'Capital of a crusader county until 1289.', tyre:'Crusader port.', homs:'Krak des Chevaliers is near.',
+  hama:'Great water wheels on the Orontes.', edessa:'First crusader state, lost in 1144.', harran:'Old city of the moon god.',
+  damietta:'Taken by crusaders in 1219 and 1249.', algiers:'Port of the Maghreb.', bejaia:'Fibonacci learns Arabic numerals here, around 1190.',
+  constantine:'City on a rock above a gorge.', ceuta:'Port across from Spain.', tangier:'Old port at the strait.',
+  rabat:'The Hassan Tower, an unfinished minaret, 1199.', tadmekka:'Desert trading town. Arabic carved in rock here in 1013 is the oldest writing in West Africa.', agadez:'Tuareg caravan town.',
+  jeddah:'Port of the pilgrims to Mecca.', muscat:'Port of Oman.', sohar:'Old trading port of Oman.', basra:'Port at the head of the Gulf.',
+  kashan:'Famous for lustre tiles.', yazd:'Desert city of fire temples.', ghazni:'Capital of Mahmud of Ghazni.', kandahar:'Old city on the road to India.',
+  urgench:'The Mongols destroy it in 1221 by flooding the river.', tashkent:'Old city of the Silk Road.', talas:'Battle of Talas, 751, where papermaking is said to reach the Islamic world.',
+  gwalior:'Hill fort with old temples.', ujjain:'City of the astronomers.', mathura:'Birthplace of Krishna.', prayag:'Where the Ganges and Yamuna meet.',
+  devagiri:'Yadava capital, taken by Delhi in 1296.', anhilwara:'Capital of Gujarat.', nanjing:'Old capital of the south.',
+  guangzhou:'Port of Arab and Persian traders. The Huaisheng Mosque.', ningbo:'Port for ships to Japan.', yinchuan:'Tangut capital, destroyed in 1227.',
+  datong:'Western capital of the Liao and Jin.', xiangyang:'The Mongols besiege it 1268–1273.', liaoyang:'Old capital of the Liao.', kaesong:'Capital of Goryeo Korea.',
+  lucca:'The Volto Santo, a wooden crucifix.', sijilmasa:'Gateway to the gold of West Africa.'
+});
+
+MORE.forEach(([id, name, lat, lon, note]) => { if (!byId[id]) SITES.push([id, name, lat, lon]); NOTES[id] = note; });
+
+// a few sites lie so close to an atlas city that they are set slightly apart, in their true direction, so both can be clicked
+SITES.forEach(([id, name, lat, lon, at]) => {
+  const p = {id, name, lat, lon, site:true, terminal:true, ...(at || toAtlas(lat, lon))};
+  const ns = near(lat, lon, 2);
+  P.push(p); byId[id] = p; adj[id] = []; regionOf[id] = regionOf[ns[0].p.id];
+  ns.forEach(({p:q}) => { const d = km(p, q)*FACTOR.r, t = d/KM_PER_DAY;
+    adj[id].push({to:q.id, m:'r', km:d, days:t, auto:true}); adj[q.id].push({to:id, m:'r', km:d, days:t, auto:true}); });
+  atlasPlaces.push(p); addMarker(p);
+});
+
+function showRoads(on) {
+  roadLayer.innerHTML = ''; $('#roadsBtn').setAttribute('aria-pressed', on); $('#roadsBtn').classList.toggle('on', on);
+  if (on) roadSegs.forEach(([a, b, name]) => { const pa = byId[a], pb = byId[b], l = document.createElementNS(NS, 'path');
+    l.setAttribute('d', `M${pa.x} ${pa.y} L${pb.x} ${pb.y}`); l.setAttribute('class', 'road'); const t = document.createElementNS(NS, 'title'); t.textContent = name; l.appendChild(t); roadLayer.appendChild(l); });
+  applyView();
+}
+// named historical roads; each is a chain of places. r road, a mountain pass, d desert, f boat crossing
+const ROADS = [
+  ['Via Appia','r',['roma','capua','benevento','taranto','brindisi']], ['Via Appia Traiana','r',['benevento','bari','brindisi']],
+  ['Via Flaminia','r',['roma','rimini']], ['Via Aemilia','r',['rimini','bologna','piacenza']], ['Via Popilia','r',['rimini','ravenna','venezia']],
+  ['Via Postumia','r',['genova','piacenza','verona','aquileia']], ['Via Aurelia','r',['roma','pisa','genova']], ['Via Cassia','r',['roma','siena','firenze']],
+  ['Via Claudia Augusta','a',['venezia','trento','bolzano','augsburg']],
+  ['Via Domitia','a',['torino','briancon','arles']], ['Via Domitia','r',['arles','nimes','narbonne','girona']],
+  ['Via Augusta','r',['girona','barcelona','tarragona','valencia','cordoba','sevilla','cadiz']],
+  ['Via de la Plata','r',['sevilla','merida','salamanca','astorga','leon']],
+  ['Camino Francés','a',['stjean','pamplona']], ['Camino Francés','r',['pamplona','burgos','leon','astorga','santiago']],
+  ['Camino Portugués','r',['lisboa','coimbra','porto','santiago']],
+  ['Via Turonensis','r',['paris','orleans','tours','poitiers','bordeaux','stjean']],
+  ['Via Podiensis','r',['lyon','lepuy','conques','moissac','stjean']], ['Via Lemovicensis','r',['vezelay','limoges','stjean']],
+  ['Via Tolosana','r',['arles','montpellier','toulouse']], ['Via Tolosana','a',['toulouse','jaca','pamplona']],
+  ['Via Agrippa','r',['lyon','langres','reims','amiens','boulogne']], ['Via Agrippa','r',['langres','metz','trier','koln']],
+  ['Rhine road','r',['koln','mainz','speyer','strasbourg','basel']],
+  ['Via Francigena','r',['boulogne','reims','besancon','lausanne']], ['Via Francigena','a',['lausanne','aosta','pavia']],
+  ['Via Francigena','r',['pavia','piacenza','lucca','siena','roma']],
+  ['Strait of Dover','f',['dover','boulogne']], ['Watling Street','r',['dover','canterbury','london','stalbans','wroxeter','chester']],
+  ['Ermine Street','r',['london','lincoln','york']], ['Fosse Way','r',['exeter','bath','cirencester','leicester','lincoln']],
+  ['Dere Street','r',['york','durham','edinburgh']],
+  ['Strait of Otranto','f',['brindisi','durres']], ['Via Egnatia','r',['durres','ohrid','thessaloniki','kavala','costantinoble']],
+  ['Via Militaris','r',['belgrade','nis','sofia','plovdiv','edirne','costantinoble']],
+  ['Amber Road','r',['aquileia','ljubljana','vienna','kalisz','gdansk']],
+  ['Danube road','r',['regensburg','passau','vienna','budapest','belgrade']],
+  ['Via Regia','r',['mainz','frankfurt','erfurt','leipzig','wroclaw','krakow']],
+  ['Hellweg','r',['koln','dortmund','paderborn','magdeburg']], ['Old Salt Road','r',['luneburg','lubeck']],
+  [null,'r',['magdeburg','luneburg','hamburg']], [null,'r',['hamburg','lubeck']], [null,'r',['prague','regensburg']], [null,'r',['prague','wroclaw']],
+  [null,'r',['augsburg','regensburg']], [null,'r',['basel','lausanne']], [null,'r',['vienna','prague']], [null,'r',['budapest','krakow']],
+  [null,'r',['krakow','lviv','kyiv']], [null,'r',['kyiv','smolensk','vladimir']], [null,'r',['ljubljana','belgrade']], [null,'r',['paris','reims']],
+  ['Pilgrims’ Road','r',['costantinoble','nicaea','dorylaeum','konya']], ['Pilgrims’ Road','a',['konya','tarsus']],
+  ['Pilgrims’ Road','r',['tarsus','antioch','aleppo','damasc']],
+  ['Royal Road','r',['sardis','ankara','kayseri','mosul','erbil','susa']], [null,'r',['nicaea','sardis']], [null,'r',['dorylaeum','ankara']],
+  [null,'r',['kayseri','sivas','erzurum','tabriz']], [null,'a',['erzurum','trebizond']],
+  ['Silk Road','d',['aleppo','raqqa','baghdad']],
+  ['Great Khorasan Road','r',['baghdad','hamadan','rey','nishapur','merv','bukhara','samarkand']],
+  ['Silk Road','r',['merv','balkh','termez','samarkand']], ['Silk Road','a',['balkh','bamiyan','kabul']],
+  ['Silk Road','r',['samarkand','khujand']], ['Silk Road','a',['khujand','kashgar']],
+  ['Silk Road','d',['kashgar','aksu','kucha','turfan','hami','dunhuang']], ['Silk Road','d',['kashgar','yarkand','khotan','dunhuang']],
+  ['Silk Road','r',['dunhuang','ganzhou','lanzhou','xian','luoyang','kaifeng']],
+  [null,'r',['tabriz','qazvin','rey']], [null,'r',['rey','isfahan','shiraz']], [null,'r',['susa','shiraz']],
+  ['Darb Zubaydah','d',['baghdad','kufa','fayd','mecca']],
+  ['King’s Highway','r',['aqaba','petra','kerak','amman','damasc']], ['Syrian Hajj road','d',['amman','tabuk','medina']],
+  ['Egyptian Hajj road','d',['babilonia','aqaba']],
+  ['Incense Route','d',['sanaa','najran','mecca']], ['Incense Route','d',['medina','petra','gaza']],
+  ['Via Maris','d',['babilonia','gaza']], ['Via Maris','r',['gaza','jaffa','acre','damasc']],
+  ['Nile road','r',['alexandria','babilonia','asyut','aswan']], ['Nile road','d',['aswan','dongola']],
+  ['Grand Trunk Road','a',['kabul','peshawar']], ['Grand Trunk Road','r',['peshawar','lahore','delhi','kannauj','varanasi','patna']],
+  [null,'r',['delhi','ajmer','cambay']],
+  ['Shu Road','a',['xian','chengdu']], ['Tea Horse Road','a',['chengdu','jokhang']], [null,'a',['jokhang','sakya','kathmandu']], [null,'a',['kathmandu','patna']],
+  ['Grand Canal','r',['luoyang','kaifeng','yangzhou','cansay']],
+  ['Mongol post road','d',['karakorum','shangdu','khanbaliq']],
+  ['Trans-Saharan route','d',['sijilmasa','taghaza','walata','mali']], ['Trans-Saharan route','d',['walata','timbuktu']],
+  ['Trans-Saharan route','d',['tripoli','ghadames','gao']], ['Trans-Saharan route','d',['tripoli','murzuk']],
+];
+ROADS.push(
+  ['Camino Primitivo','r',['oviedo','lugo','santiago']], ['Via XIX','r',['braga','lugo','astorga']], [null,'r',['braga','porto']],
+  [null,'r',['madrid','toledo']], [null,'r',['madrid','zaragoza']], [null,'r',['valencia','murcia','almeria']], [null,'r',['granada','malaga']],
+  [null,'r',['granada','almeria']], [null,'r',['zaragoza','lleida','tarragona']], [null,'r',['tarragona','tortosa','valencia']], [null,'r',['badajoz','merida']],
+  [null,'r',['lisboa','badajoz']], [null,'r',['zamora','salamanca']], [null,'r',['zamora','leon']], [null,'r',['cadiz','algeciras']],
+  ['Strait of Gibraltar','f',['algeciras','ceuta']], [null,'r',['ceuta','tangier']], [null,'r',['ceuta','fes']], [null,'r',['tangier','rabat','marrakech']],
+  [null,'r',['paris','rouen','caen']], [null,'r',['rouen','amiens']], [null,'r',['caen','rennes','nantes','angers','tours']], [null,'r',['orleans','bourges','clermont','lepuy']],
+  [null,'r',['langres','dijon','lyon']], [null,'r',['paris','provins','troyes','langres']], [null,'r',['bordeaux','bayonne','stjean']], [null,'r',['limoges','perigueux','bordeaux']],
+  [null,'r',['paris','arras','ghent','bruges']], [null,'r',['arras','boulogne']], [null,'r',['utrecht','koln']], [null,'r',['ghent','utrecht']],
+  ['Via Imperii','r',['augsburg','nuremberg','leipzig','magdeburg']], ['Via Imperii','r',['magdeburg','stettin']], [null,'r',['nuremberg','wurzburg','frankfurt']],
+  [null,'r',['bremen','hamburg']], [null,'r',['bremen','dortmund']], ['Hærvejen','r',['hamburg','hedeby']], [null,'r',['lubeck','stettin','gdansk']],
+  [null,'r',['gdansk','malbork']], [null,'r',['gdansk','riga']], [null,'r',['stockholm','lund']], ['Øresund','f',['lund','copenhagen']], ['Great Belt','f',['copenhagen','hedeby']], [null,'a',['bergen','oslo']], [null,'a',['oslo','stockholm']],
+  [null,'r',['basel','zurich','constance']], ['Gotthard Pass','a',['zurich','milano']], [null,'r',['constance','augsburg']], [null,'r',['salzburg','regensburg']],
+  [null,'r',['salzburg','vienna']], [null,'r',['london','winchester','exeter']], [null,'r',['bath','bristol']], [null,'r',['london','norwich']],
+  [null,'r',['carlisle','york']], [null,'r',['chester','carlisle']], [null,'f',['dublin','chester']], [null,'r',['dublin','armagh']], [null,'r',['dublin','waterford','cork']],
+  [null,'r',['ferrara','bologna']], [null,'r',['mantua','verona']], [null,'r',['ferrara','venezia']], ['Via Flaminia','r',['roma','spoleto','rimini']],
+  [null,'r',['perugia','spoleto']], [null,'r',['perugia','siena']], [null,'r',['benevento','foggia','bari']], ['Via Popilia','r',['capua','reggio']],
+  ['Strait of Messina','f',['reggio','messina']], [null,'r',['messina','syracuse']], [null,'r',['messina','palatina']],
+  [null,'r',['ljubljana','zagreb','belgrade']], [null,'r',['nis','skopje','thessaloniki']], [null,'r',['plovdiv','tarnovo']],
+  [null,'r',['thessaloniki','larissa','athens','corinth']], [null,'r',['vienna','esztergom','budapest']],
+  [null,'r',['kyiv','chernihiv','smolensk']], [null,'r',['smolensk','moscow','vladimir']],
+  ['Seljuk caravan road','r',['antalya','konya','sultanhani','kayseri','sivas']], [null,'r',['alanya','antalya']], [null,'r',['smyrna','sardis']],
+  [null,'r',['ankara','sinop']], [null,'r',['sivas','malatya','diyarbakir','mosul']], [null,'r',['van','tabriz']], [null,'r',['erzurum','van']],
+  [null,'a',['erzurum','tbilisi']], [null,'a',['tbilisi','tabriz']], [null,'r',['derbent','baku','tabriz']], [null,'r',['tbilisi','derbent']],
+  [null,'r',['antioch','tripolis','beirut','tyre','acre']], [null,'r',['damasc','homs','hama','aleppo']], [null,'r',['homs','tripolis']],
+  [null,'r',['aleppo','edessa','harran','raqqa']], [null,'r',['babilonia','damietta']], [null,'d',['alexandria','benghazi','tripoli']],
+  [null,'r',['tunis','constantine','bejaia','algiers','oran','tlemcen']], ['Trans-Saharan route','d',['gao','tadmekka','ghadames']], ['Trans-Saharan route','d',['agadez','murzuk']],
+  [null,'d',['agadez','tadmekka']], [null,'r',['jeddah','mecca']], [null,'r',['mecca','taif']], [null,'r',['baghdad','basra']], [null,'r',['basra','kufa']],
+  ['Strait of Hormuz','f',['hormuz','sohar']], [null,'r',['sohar','muscat']], [null,'r',['rey','kashan','isfahan']], [null,'d',['isfahan','yazd','kerman']],
+  [null,'r',['rey','gorgan','nishapur']], [null,'d',['merv','khiva','urgench']], [null,'d',['urgench','bukhara']],
+  [null,'r',['nishapur','herat','kandahar','ghazni','kabul']], [null,'r',['samarkand','tashkent','talas','burana']], [null,'a',['burana','aksu']],
+  [null,'r',['delhi','mathura','gwalior','ujjain']], [null,'r',['ujjain','devagiri']], [null,'r',['ujjain','anhilwara','cambay']], [null,'r',['cambay','broach']],
+  [null,'r',['patna','gaur']], ['Grand Trunk Road','r',['kannauj','prayag','varanasi']], [null,'r',['lahore','multan']],
+  [null,'r',['cansay','ningbo']], [null,'r',['zaiton','fuzhou','cansay']], [null,'r',['zaiton','guangzhou']], [null,'r',['cansay','nanjing','yangzhou']],
+  [null,'r',['nanjing','wuchang','changsha']], [null,'r',['xian','xiangyang','wuchang']], [null,'r',['kaifeng','jinan','khanbaliq']],
+  [null,'r',['khanbaliq','datong','taiyuan','luoyang']], [null,'r',['ganzhou','yinchuan','datong']], [null,'a',['chengdu','dali']],
+  [null,'r',['khanbaliq','liaoyang','kaesong']], [null,'d',['ganzhou','kharakhoto','karakorum']]
+);
+
+ROADS.push(
+  ['Via Valeria','r',['roma','pescara']], ['Via Salaria','r',['roma','ascoli']], [null,'r',['ascoli','ancona']], [null,'r',['ascoli','pescara']],
+  ['Via Latina','r',['roma','capua']], ['Via Julia Augusta','r',['genova','nice','arles']], ['Via Annia','r',['ferrara','padua','aquileia']],
+  ['Via Traiana Nova','r',['damasc','bosra','amman']], ['Strata Diocletiana','d',['damasc','palmyra','raqqa']],
+  ['Via Agrippa','r',['lyon','arles']], ['Via Agrippa','r',['lyon','clermont','limoges','saintes']], [null,'r',['poitiers','saintes','bordeaux']],
+  ['Via Aquitania','r',['narbonne','carcassonne','toulouse','bordeaux']], ['Regordane Way','r',['lepuy','nimes']],
+  ['Cañada Real Leonesa','r',['leon','zamora','salamanca','merida','badajoz']],
+  ['Akeman Street','r',['stalbans','cirencester']], ['Stane Street','r',['london','chichester']], ['Pilgrims’ Way','r',['winchester','canterbury']],
+  ['Golden Path','r',['passau','prague']], ['Via de Zenta','r',['ragusa','nis']],
+  ['Royal Road','r',['susa','persepolis','shiraz']], ['Darb al-Arbain','d',['asyut','kharga']], [null,'d',['tlemcen','sijilmasa']],
+  ['Silk Road','d',['burana','beshbaliq','turfan']], ['Dakshinapatha','r',['ujjain','devagiri']],
+  ['Qin Straight Road','r',['xian','baotou']], ['Southern Silk Road','a',['chengdu','dali']],
+  ['Meiling Pass road','a',['nanchang','guangzhou']],
+  ['Via Raetia','a',['bolzano','innsbruck','augsburg']], [null,'a',['bologna','firenze']], ['Syrian Desert road','d',['palmyra','hit','baghdad']], ['Mont Cenis road','a',['lyon','chambery','torino']],
+  ['Via Regia','r',['krakow','lviv','kyiv']], ['Silk Road','r',['tabriz','qazvin','rey']], ['Silk Road','r',['kayseri','sivas','erzurum','tabriz']],
+  ['Silk Road','a',['erzurum','trebizond']], ['Mongol post road','d',['karakorum','beshbaliq']], ['Grand Canal','r',['khanbaliq','jining','yangzhou']], [null,'r',['wuchang','nanchang']]
+);
+const roadSegs = [];
+ROADS.forEach(([name, m, ids]) => {
+  for (let i = 0; i < ids.length - 1; i++) {
+    const a = byId[ids[i]], b = byId[ids[i + 1]]; if (!a || !b) { console.warn('missing', ids[i], ids[i + 1]); continue; }
+    [a, b].forEach(p => { if (p.site) p.terminal = false; });   // a road runs through it, so it can be passed through
+    let e = adj[a.id].find(x => x.to === b.id);
+    if (!e) { const d = km(a, b)*FACTOR[m], t = m === 'f' ? d/SAIL_KM_PER_DAY + CROSSING_DAYS : d/KM_PER_DAY;
+      e = {to:b.id, m, km:d, days:t}; adj[a.id].push(e); adj[b.id].push({to:a.id, m, km:d, days:t}); }
+    if (e.auto) { e.auto = false; adj[b.id].find(x => x.to === a.id).auto = false; }
+    if (name) { e.road = e.road || name; adj[b.id].find(x => x.to === a.id).road ||= name; roadSegs.push([a.id, b.id, name]); }
+  }
+});
+
+// a site that real roads pass through keeps only those roads, not its automatic link to the nearest towns
+P.forEach(p => { if (!p.site || p.terminal) return;
+  adj[p.id].filter(e => e.auto).forEach(e => { adj[e.to] = adj[e.to].filter(x => x.to !== p.id); });
+  adj[p.id] = adj[p.id].filter(e => !e.auto); });
+// only the cities of today that are in From or To stay on the map and in the road network
+function pruneToday() {
+  for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; if (!p.today || p.id === state.from || p.id === state.to) continue;
+    adj[p.id].forEach(e => { adj[e.to] = adj[e.to].filter(f => f.to !== p.id); });
+    delete adj[p.id]; delete byId[p.id]; P.splice(i, 1);
+    const g = mkLayer.querySelector(`.mk[data-id="${CSS.escape(p.id)}"]`); if (g) g.remove(); }
+}
+function find(text) {
+  const t = norm(text); if (!t) return null;
+  const alias = Object.keys(ALIAS).find(a => a === t) || Object.keys(ALIAS).find(a => a.startsWith(t));
+  const atlas = atlasPlaces.find(p => norm(p.name) === t) || atlasPlaces.find(p => norm(p.name).startsWith(t)) || (alias ? byId[ALIAS[alias]] : null);
+  if (atlas) return atlas;
+  const word = atlasPlaces.find(p => norm(p.name).split(/[\s,]+/).some(w => w.length > 2 && w.startsWith(t)));
+  if (word && t.length > 2) return word;
+  const c = CITIES.find(c => c.k === t) || CITIES.find(c => c.k.startsWith(t));
+  return c ? addToday(c) : null;
+}
+['from', 'to'].forEach(k => {
+  const el = $('#'+k);
+  const commit = async () => {
+    const text = el.value.trim();
+    if (!text) { if (state[k]) { state[k] = null; pruneToday(); stopWalk(); render(); } return; }
+    if (state[k] && norm(text) === norm(byId[state[k]].name)) return;
+    let p = find(text);
+    if (!p && !CITIES.length) { await citiesReady; p = find(text); }
+    if (p) { state[k] = p.id; closePop(); pruneToday(); stopWalk(); render(); return; }
+    state[k] = null; pruneToday(); stopWalk(); render(); el.value = text; el.parentElement.classList.add('bad');
+  };
+  el.addEventListener('change', commit);
+  // the text cursor shows at the end of the name; the first key typed replaces the whole name
+  let fresh = false;
+  el.addEventListener('focus', () => { fresh = true; requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length)); });
+  el.addEventListener('mousedown', () => { fresh = false; });
+  el.addEventListener('beforeinput', () => { if (fresh) { fresh = false; el.value = ''; } });
+  // Enter moves on: from the start to the destination, from the destination straight to the walk
+  el.addEventListener('keydown', e => { if (e.key !== 'Enter') return; e.preventDefault();
+    commit().then(() => { if (current && current.length) $('#go').click(); else caretNext(); }); });
+  el.addEventListener('input', () => el.parentElement.classList.remove('bad'));
+});
+
+$('#year').addEventListener('input', e => { placeKnob(); state.year = +e.target.value; stopWalk(); render(); });
+
+
+// ------------------------------------------------------------------ why: what the alive estimate is made of, for this route and year
+const WAR = [
+  {test:inNorth, r:'west', from:1315, to:1317, t:'The Great Famine strikes northern Europe.'},
+  {r:'west', from:1347, to:1351, t:'The Black Death is spreading across Europe. About a third of the people die.'},
+  {r:'levant', from:1347, to:1349, t:'The Black Death strikes Egypt and Syria.'},
+  {r:'west', from:1361, to:1363, t:'The plague returns.'}, {r:'west', from:1369, to:1369, t:'The plague returns.'}, {r:'west', from:1374, to:1375, t:'The plague returns.'},
+  {test:inFrance, r:'west', from:1337, to:1360, t:'England and France are at war. Armies and bands of soldiers roam the roads of France.'},
+  {test:inFrance, r:'west', from:1369, to:1389, t:'England and France are at war again. Armies and bands of soldiers roam the roads of France.'},
+  {ids:['costantinoble'], from:1354, to:1400, t:'The Ottomans are taking the Balkans around Constantinople.'},
+  {r:'levant', from:1400, to:1400, t:'Timur invades Syria.'},
+  {r:'persia', from:1300, to:1334, t:'The Mongols guard the roads of Persia and Central Asia, which makes them safer.'},
+  {r:'steppe', from:1300, to:1334, t:'The Mongols guard the roads of Persia and Central Asia, which makes them safer.'},
+  {r:'steppe', from:1335, to:1380, t:'The Mongols still guard the roads of Central Asia.'},
+  {r:'persia', from:1335, to:1380, t:'The Mongol state in Persia has broken up and the roads are unsafe.'},
+  {r:'persia', from:1381, to:1400, t:'Timur is conquering Persia and Central Asia.'}, {r:'steppe', from:1381, to:1400, t:'Timur is conquering Persia and Central Asia.'},
+  {r:'cathay', from:1351, to:1368, t:'Rebellions against Mongol rule spread across China. The Ming take power in 1368.'},
+  {r:'india', from:1398, to:1399, t:'Timur sacks Delhi.'},
+  {r:'arabia', from:1300, to:1400, t:'Caravans in Arabia are often raided.'},
+];
+function explain(legs, y) {
+  const days = m => Math.round(legs.filter(l => l.m === m).reduce((s, l) => s + l.days - (m === 'f' ? CROSSING_DAYS : 0), 0));
+  const ids = new Set(legs.flatMap(l => [l.a, l.b]));
+  // the history of that year comes first, the estimate note last
+  const out = [];
+  const wars = [...new Set(WAR.filter(w => y >= w.from && y <= w.to && [...ids].some(id => w.ids ? w.ids.includes(id) : (regionOf[id] || 'west') === w.r && (!w.test || w.test(id)))).map(w => w.t))];
+  if (wars.length) out.push(`In ${y}: ` + wars.join(' '));
+  else out.push(`In ${y} no war crosses this route.`);
+  out.push('Every day on the road a walker can die of illness, cold, hunger, an accident or robbery. On an ordinary road the chance is about 1 in 2,500 a day.');
+  const parts = [];
+  if (days('a')) parts.push(`${days('a')} days on mountain passes, three times as dangerous`);
+  if (days('d')) parts.push(`${days('d')} days in the desert, more than seven times as dangerous`);
+  const boats = legs.filter(l => l.m === 'f').length; if (boats) parts.push(`${boats} boat crossing${boats > 1 ? 's' : ''}`);
+  if (parts.length) out.push('This walk has ' + parts.join(', ') + '.');
+  out.push('This is an estimate. No record of deaths on these roads exists.');
+  return out;
+}
+$('#whyBtn').onclick = () => { const open = $('#why').hidden; $('#why').hidden = !open; $('#whyBtn').setAttribute('aria-expanded', open); };
+
+// ------------------------------------------------------------------ the lines under the fields: the I of Cecilia lying down,
+// its serifs exactly as drawn, only the stem made longer to fit
+const I_GLYPH = [["M",[188,22]],["C",[173,22,128,26,128,82]],["L",[128,618]],["C",[128,674,173,678,188,678]],["C",[195,678,194,701,186,700]],["C",[168,697,139,693,109,693]],["C",[79,693,50,697,32,700]],["C",[24,701,23,678,30,678]],["C",[45,678,90,674,90,618]],["L",[100,360]],["L",[90,82]],["C",[90,26,45,22,30,22]],["C",[23,22,24,-1,32,0]],["C",[50,3,79,7,109,7]],["C",[139,7,168,3,186,0]],["C",[194,-1,195,22,188,22]],["Z",[]]];
+function serifLine(w) {
+  const s = 2/38, len = w/s, lo = 82, hi = 618;            // 2px stem (the I's stem is 38 units wide)
+  const st = y => y <= lo ? y : y >= hi ? y + len - 700 : lo + (y - lo)*(len - 700 + hi - lo)/(hi - lo);
+  const d = I_GLYPH.map(([op, c]) => { let t = op; for (let i = 0; i < c.length; i += 2) t += ` ${(st(c[i+1])*s).toFixed(2)} ${((c[i] - 25)*s).toFixed(2)}`; return t; }).join('');
+  return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${(168*s).toFixed(2)}'><path fill='#0d0d0d' d='${d}'/></svg>`)}")`;
+}
+// Ceci's hand-drawn lines (paper made white, turned a little straighter): line 1 under FROM, line 3 under TO, line 4 under YEAR
+const LINES = {from:['looks/lines/line-1-s.jpg', 881, 69], to:['looks/lines/line-3-s.jpg', 854, 66], year:['looks/lines/line-4-s.jpg', 849, 86]};   // slightly straightened
+function drawLines() {
+  let tallest = 0;
+  Object.entries(LINES).forEach(([id, [src, w, h]]) => { const el = document.getElementById(id), cw = el.clientWidth; if (!cw) return;
+    el.style.backgroundImage = `url("${src}")`; const own = cw * h / w; tallest = Math.max(tallest, own);
+    if (id === 'year') document.querySelector('.year').style.setProperty('--own', own + 'px'); });
+  if (tallest) document.documentElement.style.setProperty('--lineH', tallest + 'px');
+}
+window.addEventListener('resize', drawLines);
+
+// ------------------------------------------------------------------ result
+let current = null, stops = [];
+const fmt = n => Math.round(n).toLocaleString('en');
+const esc = t => t.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function placeKnob() { const el = $('#year'), t = (el.value - el.min)/(el.max - el.min); $('#knob').style.left = `calc(17px + ${t} * (100% - 34px))`; }
+// the text cursor waits in the field to fill next (on a computer; on a phone it would open the keyboard)
+let lastFrom = null;
+function caretNext() {
+  if (!matchMedia('(hover: hover) and (pointer: fine)').matches || document.body.classList.contains('result')) return;
+  const el = !state.from ? $('#from') : !state.to ? $('#to') : $('#from');
+  if (el && document.activeElement !== el) el.focus({preventScroll: true});
+}
+function render() {
+  document.body.classList.remove('result'); requestAnimationFrame(drawLines);
+  $('#from').value = state.from ? byId[state.from].name : ''; $('#to').value = state.to ? byId[state.to].name : '';
+  $('#from').parentElement.classList.remove('bad'); $('#to').parentElement.classList.remove('bad');
+  $('#year').value = state.year; $('#yearOut').textContent = state.year; placeKnob();
+  save();
+  if (state.from !== lastFrom) { lastFrom = state.from; setTimeout(caretNext); }
+  current = !state.from || !state.to || state.from === state.to ? null : route(state.from, state.to);
+  if (!current) { $('#why').hidden = true; $('#whyBtn').disabled = true; $('#whyBtn').setAttribute('aria-expanded', false); stops = state.from ? [{id:state.from, day:1, km:0}] : []; if (state.to) stops.push({id:state.to, day:1, km:0}); current = null; showList(); $('#tDays').textContent = '—'; $('#tKm').textContent = '—'; $('#tAlive').textContent = '—'; drawRoute([]); return; }
+  const days = current.reduce((s, l) => s + l.days, 0), kms = current.reduce((s, l) => s + l.km, 0);
+  $('#why').innerHTML = explain(current, state.year).map(t => `<p>${t}</p>`).join(''); $('#whyBtn').disabled = false;
+  $('#sentence').innerHTML = `Walking from <span data-edit="from">${esc(byId[state.from].name)}</span> to <span data-edit="to">${esc(byId[state.to].name)}</span> in <span data-edit="year">${state.year}</span> takes <b>${fmt(days)} days</b> over <b>${fmt(kms)} km</b>, with a <b>${pct(survival(current, state.year))}</b> chance of arriving alive.`;
+  $('#tDays').textContent = fmt(days); $('#tKm').textContent = fmt(kms); $('#tAlive').textContent = current.length ? pct(survival(current, state.year)) : '—';
+  stops = [{id:state.from, day:1, km:0, m:''}]; let day = 1;
+  current.forEach(l => { day += l.days; stops.push({id:l.b, day, km:l.km, m:l.m, road:l.road}); });
+  showList();
+  drawRoute(current);
+}
+function drawRoute(legs) {
+  routeLayer.innerHTML = '';
+  legs.forEach(l => { const a = byId[l.a], b = byId[l.b]; const pth = document.createElementNS(NS, 'path');
+    pth.setAttribute('d', `M${a.x} ${a.y} L${b.x} ${b.y}`); pth.setAttribute('class', 'route' + (l.m === 'f' ? ' sea' : '')); routeLayer.appendChild(pth); });
+  applyView();
+}
+
+
+// ------------------------------------------------------------------ one line: every city crossed, with the km left to the destination
+function showList(now) {
+  const el = $('#trail'); el.innerHTML = '';
+  if (!current || !current.length) return;
+  const total = stops.reduce((s, st) => s + st.km, 0); let done = 0;
+  let lastRoad = null;
+  el.innerHTML = stops.map((st, i) => { done += st.km; const left = total - done;
+    const road = st.road && st.road !== lastRoad ? `<i>${st.road}</i>` : ''; lastRoad = st.road || null;
+    return road + `<span${i === now ? ' class="now"' : ''}>${byId[st.id].site ? '† ' : ''}${byId[st.id].name}${left > 0.5 ? `<b>${fmt(left)} km</b>` : ''}</span>`; }).join('');
+  const cur = el.querySelector('.now'); if (cur) cur.scrollIntoView({block:'nearest', inline:'center'});
+}
+// ------------------------------------------------------------------ the walk: the cross travels the route
+let timer = null;
+function stopWalk() { if (timer) clearTimeout(timer); timer = null; $('#stop').disabled = true; $('#go').disabled = false; const t = ov.querySelector('.token'); if (t) t.remove(); }
+$('#stop').onclick = () => stopWalk();
+// clicking ATLAS starts again: no walk, the year of the atlas, the whole map
+function resetAll() {
+  stopWalk(); closePop(); state.from = null; state.to = null; state.year = 1375; pruneToday();
+  ['from', 'to'].forEach(k => { $('#'+k).value = ''; $('#'+k).parentElement.classList.remove('bad'); });
+  $('#why').hidden = true; $('#about').hidden = true; $('#aboutBtn').setAttribute('aria-expanded', false); document.body.classList.remove('about-open'); showRoads(false);
+  render(); placeKnob(); touched = false; fitAll(); window.scrollTo({top: 0, behavior: 'smooth'}); lastFrom = undefined; caretNext();
+}
+$('.brand').addEventListener('click', resetAll);
+$('.brand').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resetAll(); } });
+// ABOUT takes the place of the walk under the map, like the result does; clicking it again brings the walk back
+$('#aboutBtn').onclick = () => { const open = $('#about').hidden; $('#about').hidden = !open; $('#aboutBtn').setAttribute('aria-expanded', open);
+  document.body.classList.toggle('about-open', open); if (!open) drawLines(); };
+$('#roadsBtn').onclick = () => showRoads($('#roadsBtn').getAttribute('aria-pressed') !== 'true');
+// no clear button: click a field and type over it; in the sentence, click a place or the year to change it
+function editWalk(k) { stopWalk(); document.body.classList.remove('result'); drawLines();
+  if (k === 'year') { $('#year').focus(); return; } $('#' + k).focus(); }
+$('#sentence').addEventListener('click', e => { const t = e.target.closest('[data-edit]'); editWalk(t ? t.dataset.edit : 'from'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('result')) editWalk('from'); });
+function markLeg(n) { showList(n); }
+$('#go').onclick = () => {
+  if (!current || !current.length) { $(!state.from ? '#from' : '#to').focus(); return; }   // WALK is always there; with a field missing it points to it
+  document.body.classList.add('result'); stopWalk(); $('#go').disabled = true; $('#stop').disabled = false;
+  const tok = document.createElementNS(NS, 'g'); tok.setAttribute('class', 'token');
+  tok.innerHTML = '<image href="looks/cross.gif" x="-32" y="-32" width="64" height="64"/>';
+  ov.appendChild(tok); const start = byId[state.from]; tok.dataset.x = start.x; tok.dataset.y = start.y; applyView();
+  markLeg(0);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let i = 0;
+  const step = () => {
+    if (i >= current.length) { $('#stop').disabled = true; $('#go').disabled = false; timer = null; return; }
+    const l = current[i], a = byId[l.a], b = byId[l.b];
+    const dur = reduce ? 0 : Math.min(1400, 350 + l.km*0.6), t0 = performance.now();
+    const anim = now => { const t = dur ? Math.min(1, (now-t0)/dur) : 1;
+      tok.dataset.x = a.x + (b.x-a.x)*t; tok.dataset.y = a.y + (b.y-a.y)*t; tok.setAttribute('transform', `translate(${tok.dataset.x} ${tok.dataset.y}) scale(${Math.max(0.42, Math.min(1, chart.clientWidth/1300))/view.s})`);
+      if (t < 1 && timer) requestAnimationFrame(anim); };
+    requestAnimationFrame(anim);
+    timer = setTimeout(() => { markLeg(i + 1); i++; if (timer) step(); }, dur + 120);
+  };
+  timer = 1; step();
+};
+
+// alternative layouts to compare: add #b or #c to the link
+const lay = () => { document.body.classList.toggle('lay-b', location.hash === '#b'); document.body.classList.toggle('lay-c', location.hash === '#c'); };
+lay(); window.addEventListener('hashchange', lay);
+render();
+
+// ------------------------------------------------------------------ letters a pixel off: each letter of the words on the page
+// sits 1px higher, 1px lower or where it is, the same way every time; too small to notice, enough to not look typeset
+const JIT = [0, 1, 0, -1, 0, 0, -1, 1, 0];
+function jitter(el) {
+  let n = 0;
+  const walk = node => {
+    if (node.nodeType === 3) {
+      if (!node.data.trim() || (node.parentNode.classList && (node.parentNode.classList.contains('j') || node.parentNode.classList.contains('jw')))) return;
+      // the letters stay together in one word box, so a grid or flex parent still sees one item
+      const frag = document.createElement('span'); frag.className = 'jw';
+      for (const ch of node.data) {
+        if (ch === ' ') { frag.appendChild(document.createTextNode(' ')); continue; }
+        const sp = document.createElement('span'); sp.className = 'j'; sp.textContent = ch;
+        const d = JIT[(n * 7 + ch.charCodeAt(0) * 3) % JIT.length]; n++;
+        if (d) sp.style.top = d + 'px';
+        frag.appendChild(sp);
+      }
+      node.replaceWith(frag);
+    } else if (node.nodeType === 1 && !['INPUT', 'SCRIPT', 'STYLE', 'svg', 'IMG'].includes(node.nodeName)) [...node.childNodes].forEach(walk);
+  };
+  walk(el);
+}
+const JIT_SEL = '.brand, label.f, .ylab, #yearOut, #roadsBtn, #aboutBtn, #stop, #whyBtn, .sentence, .trail, .whytext, .about, #popName, #popNote';
+const jitObs = new MutationObserver(list => { jitObs.disconnect(); new Set(list.map(m => m.target.closest ? m.target.closest(JIT_SEL) : m.target.parentNode.closest(JIT_SEL))).forEach(el => el && jitter(el)); watchJitter(); });
+function watchJitter() { document.querySelectorAll(JIT_SEL).forEach(el => jitObs.observe(el, {childList: true, characterData: true, subtree: true})); }
+document.querySelectorAll(JIT_SEL).forEach(jitter); watchJitter();
+requestAnimationFrame(() => fitAll()); window.addEventListener('load', () => { if (!touched) fitAll(); caretNext(); });
+</script>
+
+</html>
