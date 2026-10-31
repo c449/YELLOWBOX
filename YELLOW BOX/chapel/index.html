@@ -416,8 +416,13 @@ function build(){
 
   /* the car from the video, parked in the middle of the nave and still: its front (first frame) faces the door,
      its rear (frame 274) faces the altar; shown exactly as filmed, wheels on the floor, at the video's own scale */
-  {const L2=new THREE.TextureLoader(),w=5.38,h=2.45,cy=-.5+h/2;
-    for(const[file,ry,dz]of[['img/car-front.png',0,.01],['img/car-back.png',PI,-.01]]){
+  {const L2=new THREE.TextureLoader(),w=5.38,h=2.45,ppm=846/w;
+    // a soft shadow on the stone where it stands
+    {const c=mk(128,256),x=c.getContext('2d'),g=x.createRadialGradient(64,128,0,64,128,64);g.addColorStop(0,'rgba(0,0,0,.55)');g.addColorStop(.7,'rgba(0,0,0,.25)');g.addColorStop(1,'rgba(0,0,0,0)');
+      x.setTransform(1,0,0,2,0,0);x.fillStyle=g;x.fillRect(0,0,128,128);
+      const sh=new THREE.Mesh(new THREE.PlaneGeometry(2.6,5.2),new THREE.MeshBasicMaterial({map:tex(c),transparent:true,depthWrite:false}));sh.rotation.x=-PI/2;sh.position.set(0,.006,-L/2);scene.add(sh);}
+    // ground row of each picture: where the wheels meet the floor
+    for(const[file,ry,dz,ground]of[['img/car-front.png',0,.01,322],['img/car-back.png',PI,-.01,318]]){const cy=h/2-(386-ground)/ppm;
       const t=L2.load(file);t.encoding=THREE.sRGBEncoding;
       const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,toneMapped:false}));
       m.rotation.y=ry;m.position.set(0,cy,-L/2+dz);scene.add(m);}}
