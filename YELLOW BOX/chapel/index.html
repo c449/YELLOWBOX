@@ -356,7 +356,7 @@ function chancelColumns(){
 
 function mat(S,side){return new THREE.MeshLambertMaterial({map:tex(S),side:side||THREE.FrontSide});}
 function add(geo,material){const m=new THREE.Mesh(geo,material);scene.add(m);return m;}
-let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null,car=null;
+let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null;
 
 function build(){
   const nw=G.nw,L=G.L,Hw=G.wallH,A=G.arch,P=G.ap,O=G.out,D=G.door,DS=THREE.DoubleSide;
@@ -414,18 +414,6 @@ function build(){
     const h=.7,m=add(new THREE.PlaneGeometry(h*170/200,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
     m.position.set(0,1.72,G.altarZ);cross={m,t,cols,rows,n:195,y:1.72};}
 
-  /* the car from the video, parked and still in the middle of the nave, front to the door. The video is a full
-     turntable (one turn in 540 frames); 72 of its views, one every 5 degrees, sit on one sheet, and the car shows
-     the view that matches where you stand, so it reads as a whole object from every side */
-  {const cols=9,rows=8,n=72,w=5.38,h=2.45,ppm=846/w,ground=305;
-    const t=new THREE.TextureLoader().load('img/car-views.webp');t.encoding=THREE.sRGBEncoding;t.repeat.set(1/cols,1/rows);t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));
-    m.position.set(0,h/2-(386-ground)/ppm,-L/2);scene.add(m);car={m,t,cols,rows,n};
-    // a soft shadow on the stone where it stands
-    const c=mk(128,256),x=c.getContext('2d'),g=x.createRadialGradient(64,128,0,64,128,64);g.addColorStop(0,'rgba(0,0,0,.55)');g.addColorStop(.7,'rgba(0,0,0,.25)');g.addColorStop(1,'rgba(0,0,0,0)');
-    x.setTransform(1,0,0,2,0,0);x.fillStyle=g;x.fillRect(0,0,128,128);
-    const sh=new THREE.Mesh(new THREE.PlaneGeometry(2.6,5.2),new THREE.MeshBasicMaterial({map:tex(c),transparent:true,depthWrite:false}));sh.rotation.x=-PI/2;sh.position.set(0,.006,-L/2);scene.add(sh);}
-
   /* slit windows and their light */
   const wmat=new THREE.MeshBasicMaterial({color:'#fffaf0',side:DS});
   const slitGeo=(w,h)=>{const s=new THREE.Shape(),r=w/2;s.moveTo(-r,0);s.lineTo(-r,h-r);s.absarc(0,h-r,r,PI,0,true);s.lineTo(r,0);s.lineTo(-r,0);return new THREE.ShapeGeometry(s,16);};
@@ -477,7 +465,7 @@ const STATIONS={outside:{x:0,z:14,yaw:0,pitch:.15},door:{x:0,z:-.8,yaw:0,pitch:.
 const cam=Object.assign({y:1.6},STATIONS.outside);
 function inBuilding(x,z){return(Math.abs(x)<G.out.hw+.35&&z<G.out.front+.35&&z>G.arch.z1)||(Math.abs(x)<G.out.apHw+.35&&z<=G.arch.z1&&z>G.out.apBack-.35);}
 function allowed(x,z){
-  if(Math.abs(x)<=2.0&&z<=-.35&&z>=-10.7)return !(Math.abs(x)<1.3&&Math.abs(z+G.L/2)<2.3);   // nave, around the parked car
+  if(Math.abs(x)<=2.0&&z<=-.35&&z>=-10.7)return true;            // nave
   if(Math.abs(x)<=.7&&z<-10.7&&z>=-11.95)return true;             // under the arch
   if(Math.abs(x)<=1.05&&z<-11.95&&z>=G.altarZ+.55)return true;    // apse
   if(Math.abs(x)<=.45&&z>-.36&&z<=G.out.front+.4)return true;     // doorway
@@ -542,8 +530,6 @@ function frame(now){
   const bob=(f||s)?Math.sin(T*9)*.012:0;
   camera.position.set(cam.x,cam.y+bob,cam.z);camera.rotation.set(cam.pitch,cam.yaw,0);
   if(lantern)lantern.position.set(cam.x,cam.y+.3,cam.z);
-  if(car){const a=Math.atan2(cam.x-car.m.position.x,cam.z-car.m.position.z),i=((Math.round(a/(2*PI)*car.n)%car.n)+car.n)%car.n;
-    car.t.offset.set((i%car.cols)/car.cols,1-(Math.floor(i/car.cols)+1)/car.rows);car.m.rotation.y=a;}
   if(cross){const i=Math.floor(T*25)%cross.n;cross.t.offset.set((i%cross.cols)/cross.cols,1-(Math.floor(i/cross.cols)+1)/cross.rows);
     cross.m.position.y=cross.y+Math.sin(T*.7)*.06;cross.m.rotation.y=Math.atan2(cam.x-cross.m.position.x,cam.z-cross.m.position.z);}
   for(const c of candles){if(!c)continue;const fl=.82+.1*Math.sin(T*7.3+c.ph)+.06*Math.sin(T*13.1+c.ph*2)+.04*Math.sin(T*23+c.ph);c.pl.intensity=1.1*fl;c.sp.scale.set(.09*fl,.16*(.9+.2*fl),1);c.halo.material.opacity=.2*fl;}
