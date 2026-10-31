@@ -236,7 +236,7 @@ function endWall(kind){
   }else{
     paint(S,'6737',X(-2.3),Y(3.4),1.62*ppm,2.6*ppm,{cover:true,top:true});
     paint(S,'6696',X(.68),Y(3.4),1.62*ppm,2.6*ppm,{cover:true,top:true});
-    paint(S,'6778',X(-1.6),Y(4.6),3.2*ppm,.95*ppm,{crop:[0,.47,1,1],cover:true});   // below the round window
+    paint(S,'6778',X(-.66),Y(3.8),1.32*ppm,1.1*ppm,{crop:[0,.47,1,1],cover:true});   // between the door and the round window
   }
   age(S);return S;
 }
@@ -375,7 +375,7 @@ function build(){
   m=add(shapeGeo(wallShape(nw,Hw,nw,{r:A.ro,cy:A.cy,ext:A.ext}),-nw,0,2*nw,Hw+nw),mat(E),E);m.position.z=A.z0;
   const W=endWall('west');
   // round window high in the west wall, above the door
-  const OC={y:5.0,r:.32},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
+  const OC={y:4.85,r:.96},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
   {const ws=wallShape(nw,Hw,nw,D);ws.holes.push(oculus());m=add(shapeGeo(ws,-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;}
 
   /* stepped horseshoe arch */
