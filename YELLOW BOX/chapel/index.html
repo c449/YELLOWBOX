@@ -375,8 +375,10 @@ function build(){
   m=add(shapeGeo(wallShape(nw,Hw,nw,{r:A.ro,cy:A.cy,ext:A.ext}),-nw,0,2*nw,Hw+nw),mat(E),E);m.position.z=A.z0;
   const W=endWall('west');
   // round window high in the west wall, above the door
-  const OC={y:4.85,r:.96},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
-  {const ws=wallShape(nw,Hw,nw,D);ws.holes.push(oculus());m=add(shapeGeo(ws,-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;}
+  const OC={y:4.85,r:.64},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
+  {const ws=wallShape(nw,Hw,nw,D);ws.holes.push(oculus());m=add(shapeGeo(ws,-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;
+    // glass in the round window, set in the middle of the wall's thickness
+    const gl=add(new THREE.CircleGeometry(OC.r,64),new THREE.MeshBasicMaterial({color:'#e9f0f2',transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false}));gl.position.set(0,OC.y,.45);}
 
   /* stepped horseshoe arch */
   add(reveal(A.ro,A.cy,A.ext,A.z0,A.zs),stoneIn);
@@ -417,8 +419,8 @@ function build(){
     const h=.7,m=add(new THREE.PlaneGeometry(h*170/200,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
     m.position.set(0,1.72,G.altarZ);cross={m,t,cols,rows,n:195,y:1.72};}
 
-  /* the car: the real 3D model (lambo.glb, lightened), standing on its own checkered floor in the middle of
-     the nave, front to the door. Scaled so the car is 4.27 m long. */
+  /* the car: the real 3D model (lambo.glb, lightened), standing on the stone floor in the middle of the nave,
+     front to the door; the model's own checkered floor is left out. Scaled so the car is 4.27 m long. */
   {const scale0=1;new THREE.GLTFLoader().load('img/car-lite.glb',g=>{
     const root=g.scene,floorParts=[],carParts=[];
     root.traverse(o=>{if(o.isMesh){(o.name.indexOf('Cubo')===0||o.parent&&o.parent.name.indexOf('Cubo')===0?floorParts:carParts).push(o);}});
@@ -430,7 +432,8 @@ function build(){
     const dir=Math.atan2(ce.x-cb.x,ce.z-cb.z);const piv=new THREE.Group();piv.add(root);root.rotation.y=-dir;piv.updateMatrixWorld(true);
     const b2=new THREE.Box3();carParts.forEach(o=>b2.expandByObject(o));const len=b2.max.z-b2.min.z,k=4.27/len;
     piv.scale.setScalar(k);piv.updateMatrixWorld(true);
-    const all=new THREE.Box3().setFromObject(piv),c2=all.getCenter(new THREE.Vector3());
+    floorParts.forEach(o=>o.visible=false);
+    const all=new THREE.Box3();carParts.forEach(o=>all.expandByObject(o));const c2=all.getCenter(new THREE.Vector3());
     piv.position.set(-c2.x,-all.min.y,-L/2-c2.z);scene.add(piv);piv.updateMatrixWorld(true);
     const bb=new THREE.Box3();carParts.forEach(o=>bb.expandByObject(o));CARBOX={x0:bb.min.x,x1:bb.max.x,z0:bb.min.z,z1:bb.max.z};
     carParts.concat(floorParts).forEach(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial){m.envMap=ENV;m.envMapIntensity=1;m.needsUpdate=true;}});
