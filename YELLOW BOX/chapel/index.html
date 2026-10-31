@@ -378,10 +378,8 @@ function build(){
   const OC={y:4.85,r:.64},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
   {const ws=wallShape(nw,Hw,nw,D);ws.holes.push(oculus());m=add(shapeGeo(ws,-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;
     // glass in the round window, set in the middle of the wall's thickness
-    // plain light blue glass, no pattern
-    const glass=new THREE.MeshBasicMaterial({color:'#bcdcec',side:THREE.DoubleSide,toneMapped:false});
-    const gl=add(new THREE.CircleGeometry(OC.r,64),glass);gl.position.set(0,OC.y,.8);
-    const fr=add(new THREE.TorusGeometry(OC.r-.015,.025,8,64),new THREE.MeshLambertMaterial({color:'#2a2826'}));fr.position.set(0,OC.y,.8);}
+    // the round window stays open, no glass
+  }
 
   /* stepped horseshoe arch */
   add(reveal(A.ro,A.cy,A.ext,A.z0,A.zs),stoneIn);
