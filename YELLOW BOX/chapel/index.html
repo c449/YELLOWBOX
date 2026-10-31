@@ -71,7 +71,7 @@ const PI=Math.PI;
 // color = photographed in color; black-and-white plates get a light plaster wash
 const META={"6707":{"color":true},"6712":{"color":true},"6769":{"color":true},"6771":{"color":true},"6728":{"color":true},"6731":{},"6683":{"color":true},"6756":{},"6757":{},"6760":{},"6763":{},"6765":{},"6739":{},"6705":{},"6740":{},"6738":{},"6780":{},"6743":{},"6772":{},"6775":{},"6776":{},"6782":{},"6700":{},"6701":{},"6709":{},"6741":{},"6764":{},"6768":{},"6781":{},"6783":{},"6724":{"color":true},"6702":{"color":true},"6742":{"color":true},"6735":{},"6778":{},"6737":{"color":true},"6696":{"color":true},"6690":{},"6698":{},"6710":{},"6767":{},"6708":{},"6691":{},"6716":{},"6766":{"color":true}};
 const IDS=Object.keys(META);
-const IMGS={};let LOGO=null;
+const IMGS={};let LOGO=null,CROSS=null;
 const C={mortar:'#97928a',plaster:'#d4cfc4',dark:'#1c1a17'};
 
 // Chapel geometry in metres, after the reference plan: single nave, stepped horseshoe arch, square apse
@@ -91,7 +91,7 @@ function load(){
     im.onload=()=>{IMGS[n]=im;res();};
     im.onerror=res;
     im.src='img/'+n+'.jpg';
-  })).concat(new Promise(res=>{const im=new Image();im.onload=()=>{LOGO=im;res();};im.onerror=res;im.src='img/logo.png';})));
+  })).concat(new Promise(res=>{const im=new Image();im.onload=()=>{LOGO=im;res();};im.onerror=res;im.src='img/logo.png';}),new Promise(res=>{const im=new Image();im.onload=()=>{CROSS=im;res();};im.onerror=res;im.src='img/cross.webp';})));
 }
 
 /* ---------- stone and plaster ---------- */
@@ -358,7 +358,7 @@ function chancelColumns(){
 
 function mat(S,side){return new THREE.MeshLambertMaterial({map:tex(S),side:side||THREE.FrontSide});}
 function add(geo,material){const m=new THREE.Mesh(geo,material);scene.add(m);return m;}
-let candles=[],beamMeshes=[],dust=null,lantern=null;
+let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null;
 
 function build(){
   const nw=G.nw,L=G.L,Hw=G.wallH,A=G.arch,P=G.ap,O=G.out,D=G.door,DS=THREE.DoubleSide;
@@ -410,6 +410,11 @@ function build(){
   m=add(new THREE.BoxGeometry(1.3,.12,.8),[slabSide,slabSide,slabTop,slabSide,slabSide,slabSide]);m.position.set(0,G.step+.96,aZ);
 
   chancelColumns();
+
+  /* the turning cross from the GIF, floating over the middle of the nave; 195 frames on a 16 x 13 sheet */
+  if(CROSS){const cols=16,rows=13,t=tex(CROSS);t.repeat.set(1/cols,1/rows);t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;
+    const h=1.5,m=add(new THREE.PlaneGeometry(h*170/200,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
+    m.position.set(0,2.75,-L/2);cross={m,t,cols,rows,n:195,y:2.75};}
 
   /* slit windows and their light */
   const wmat=new THREE.MeshBasicMaterial({color:'#fffaf0',side:DS});
@@ -526,6 +531,8 @@ function frame(now){
   const bob=(f||s)?Math.sin(T*9)*.012:0;
   camera.position.set(cam.x,cam.y+bob,cam.z);camera.rotation.set(cam.pitch,cam.yaw,0);
   lantern.position.set(cam.x,cam.y+.3,cam.z);
+  if(cross){const i=Math.floor(T*25)%cross.n;cross.t.offset.set((i%cross.cols)/cross.cols,1-(Math.floor(i/cross.cols)+1)/cross.rows);
+    cross.m.position.y=cross.y+Math.sin(T*.7)*.06;cross.m.rotation.y=Math.atan2(cam.x-cross.m.position.x,cam.z-cross.m.position.z);}
   for(const c of candles){if(!c)continue;const fl=.82+.1*Math.sin(T*7.3+c.ph)+.06*Math.sin(T*13.1+c.ph*2)+.04*Math.sin(T*23+c.ph);c.pl.intensity=1.1*fl;c.sp.scale.set(.09*fl,.16*(.9+.2*fl),1);c.halo.material.opacity=.2*fl;}
   for(const b of beamMeshes)b.material.uniforms.t.value=T;
   if(dust){const a=dust.pts.geometry.attributes.position;for(let i=0;i<a.count;i++){const p=dust.base[i*2],ph=dust.base[i*2+1];a.setXYZ(i,p.x+Math.sin(T*.13+ph)*.1,p.y+Math.sin(T*.09+ph*1.7)*.15,p.z+Math.cos(T*.11+ph)*.1);}a.needsUpdate=true;}
