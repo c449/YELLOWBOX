@@ -15,11 +15,11 @@ html,body{height:100%}
 body{background:var(--black);color:var(--white);font-family:var(--base);font-weight:700;text-transform:uppercase;font-size:14px;overflow:hidden;-webkit-user-select:none;user-select:none}
 #stage{position:fixed;inset:0;touch-action:none;cursor:grab}
 #stage.dragging{cursor:grabbing}
-#stage.over{cursor:zoom-in}
 #stage canvas{display:block;width:100%;height:100%}
 .chrome{position:fixed;left:0;top:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px;
   padding-top:calc(16px + env(safe-area-inset-top,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1{font-family:var(--head);font-weight:400;font-size:2rem;line-height:1;margin:0;padding:.3rem .5rem;background:var(--black);color:var(--white)}
+#player iframe{display:block;width:356px;max-width:calc(100vw - 32px);height:200px;border:0;background:var(--black)}
 button{font-family:var(--base);font-weight:700;font-size:.8rem;text-transform:uppercase;color:var(--white);background:var(--black);border:0;border-radius:0;padding:.5rem .6rem;cursor:pointer;line-height:1}
 button:focus-visible{outline:2px solid var(--white);outline-offset:-2px}
 button[aria-pressed="true"]{background:var(--white);color:var(--black)}
@@ -29,22 +29,10 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
 .pad svg{width:14px;height:14px;fill:var(--white)}
 .pad .up{grid-column:2;grid-row:1}.pad .lt{grid-column:1;grid-row:2}.pad .dn{grid-column:2;grid-row:2}.pad .rt{grid-column:3;grid-row:2}
 @media (pointer:coarse){.pad{display:grid}}
-.tip{position:fixed;pointer-events:none;font-size:.75rem;color:var(--white);background:var(--black);padding:.25rem .4rem;white-space:nowrap;transform:translate(14px,14px)}
 .loader{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:8px;background:var(--black);transition:opacity 1s ease;z-index:5;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .loader.done{opacity:0;pointer-events:none}
 .loader .lt1{font-family:var(--head);font-weight:400;font-size:3rem;line-height:1;margin:0}
-.loader .lt2{margin:0;font-variant-numeric:tabular-nums}
-.loader .bar{width:min(260px,70vw);height:2px;background:var(--black)}
-.loader .bar i{display:block;height:100%;width:0;background:var(--white)}
-.lightbox{position:fixed;inset:0;z-index:6;background:var(--black);display:grid;grid-template-rows:1fr auto;
-  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-.lightbox figure{margin:0;display:grid;place-items:center start;min-height:0}
-.lightbox img{max-width:100%;max-height:calc(100vh - 100px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));max-height:calc(100dvh - 100px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));object-fit:contain}
-.lightbox .bar2{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding-top:12px}
-.lightbox .cap{font-variant-numeric:tabular-nums}
-.lightbox .ctl{display:flex;gap:0}
-.lightbox .ctl button{border:1px solid var(--white);margin-left:-1px}
 .fail{position:fixed;inset:0;display:flex;align-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px))}
 @media (prefers-reduced-motion:reduce){.loader{transition:none}}
 </style>
@@ -53,6 +41,8 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
 
 <header class="chrome">
   <h1>CC Chapel</h1>
+  <button id="play" aria-pressed="false">Play</button>
+  <div id="player" hidden></div>
 </header>
 
 <div class="pad" aria-label="Walk">
@@ -62,24 +52,8 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
   <button class="rt" data-mv="r" aria-label="Right"><svg viewBox="0 0 10 10"><path d="M9 5 1 9V1z"/></svg></button>
 </div>
 
-<div class="tip" id="tip" hidden></div>
-
 <div class="loader" id="loader">
   <p class="lt1">CC Chapel</p>
-  <p class="lt2" id="lmsg">0 / 45</p>
-  <div class="bar"><i id="lbar"></i></div>
-</div>
-
-<div class="lightbox" id="lb" hidden role="dialog" aria-modal="true" aria-label="Painting">
-  <figure><img id="lbimg" alt=""></figure>
-  <div class="bar2">
-    <div class="cap" id="lbcap"></div>
-    <div class="ctl">
-      <button id="lbprev">Previous</button>
-      <button id="lbnext">Next</button>
-      <button id="lbclose">Close</button>
-    </div>
-  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -105,11 +79,10 @@ let seed=11;function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^s
 const $=s=>document.querySelector(s);
 
 function load(){
-  let done=0;
   return Promise.all(IDS.map(n=>new Promise(res=>{
     const im=new Image();im.decoding='async';
-    im.onload=()=>{IMGS[n]=im;done++;$('#lbar').style.width=(done/IDS.length*100)+'%';$('#lmsg').textContent=`${done} / ${IDS.length}`;res();};
-    im.onerror=()=>{done++;res();};
+    im.onload=()=>{IMGS[n]=im;res();};
+    im.onerror=res;
     im.src='img/'+n+'.jpg';
   })).concat(new Promise(res=>{const im=new Image();im.onload=()=>{LOGO=im;res();};im.onerror=res;im.src='img/logo.png';})));
 }
@@ -273,12 +246,13 @@ function apseSide(list){
   const w=Lm/list.length;list.forEach((n,i)=>paint(S,n,(i*w+.02)*ppm,Y(2.45),(w-.04)*ppm,1.6*ppm,{cover:true,top:true}));
   age(S);return S;
 }
-// altar slab: plain stone with the CECI logo in place of the old carving
+// altar slab: the CECI logo set into the stone in place of the old carving
 function mensaTex(){
   const W=1300,H=800,S=surface(W,H),ctx=S.ctx;
-  ctx.fillStyle='#bdb8ae';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#a49f95';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.globalCompositeOperation='multiply';ctx.globalAlpha=.6;ctx.fillStyle=ctx.createPattern(noise(),'repeat');ctx.fillRect(0,0,W,H);ctx.restore();
-  if(LOGO){const k=Math.min(W*.86/LOGO.naturalWidth,H*.8/LOGO.naturalHeight),w=LOGO.naturalWidth*k,h=LOGO.naturalHeight*k;ctx.drawImage(LOGO,(W-w)/2,(H-h)/2,w,h);}
+  if(LOGO){const k=Math.min(W*.92/LOGO.naturalWidth,H*.86/LOGO.naturalHeight),w=LOGO.naturalWidth*k,h=LOGO.naturalHeight*k;
+    ctx.save();ctx.globalCompositeOperation='multiply';ctx.drawImage(LOGO,(W-w)/2,(H-h)/2,w,h);ctx.restore();}
   return S;
 }
 function tile(o){const ppm=640,S=surface(1024,1024);rubble(S.ctx,0,0,1024,1024,ppm,Object.assign({tile:true},o));return S;}
@@ -324,7 +298,6 @@ if(renderer.capabilities.maxTextureSize<4096)PPM=200;
 
 const scene=new THREE.Scene();scene.background=new THREE.Color('#d9d7d0');scene.fog=new THREE.Fog('#d9d7d0',22,95);
 const camera=new THREE.PerspectiveCamera(64,1,.05,200);camera.rotation.order='YXZ';
-const paintable=[];
 /* ---------- two columns at the chancel arch, cut from the same stone as the walls ---------- */
 function roughStone(w,h,ppm){
   const S=surface(w*ppm,h*ppm),ctx=S.ctx;ctx.fillStyle='#8c857a';ctx.fillRect(0,0,S.W,S.H);
@@ -377,7 +350,7 @@ function chancelColumns(){
 }
 
 function mat(S,side){return new THREE.MeshLambertMaterial({map:tex(S),side:side||THREE.FrontSide});}
-function add(geo,material,S){const m=new THREE.Mesh(geo,material);scene.add(m);if(S&&S.regions.length){m.userData.S=S;paintable.push(m);}return m;}
+function add(geo,material){const m=new THREE.Mesh(geo,material);scene.add(m);return m;}
 let candles=[],beamMeshes=[],dust=null,lantern=null;
 
 function build(){
@@ -495,7 +468,6 @@ function allowed(x,z){
 function move(dx,dz){if(allowed(cam.x+dx,cam.z+dz)){cam.x+=dx;cam.z+=dz;}else if(allowed(cam.x+dx,cam.z))cam.x+=dx;else if(allowed(cam.x,cam.z+dz))cam.z+=dz;}
 const keys={};let tween=null;
 addEventListener('keydown',e=>{
-  if(!$('#lb').hidden){if(e.key==='Escape')closeLB();if(e.key==='ArrowRight')stepLB(1);if(e.key==='ArrowLeft')stepLB(-1);return;}
   if(e.target.closest&&e.target.closest('button')&&(e.key===' '||e.key==='Enter'))return;
   keys[e.code]=true;if(/Arrow|Key[WASD]/.test(e.code)){e.preventDefault();tween=null;}
 });
@@ -510,45 +482,24 @@ document.querySelectorAll('[data-mv]').forEach(b=>{
   const on=e=>{e.preventDefault();padState[b.dataset.mv]=true;tween=null;},off=()=>{padState[b.dataset.mv]=false;};
   b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointerleave',off);b.addEventListener('pointercancel',off);
 });
-let drag=null,hover=null;
+let drag=null;
 stage.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,t:performance.now(),id:e.pointerId};stage.setPointerCapture(e.pointerId);});
 stage.addEventListener('pointermove',e=>{
   if(drag&&drag.id===e.pointerId){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
     if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>5){stage.classList.add('dragging');tween=null;cam.yaw+=dx*.0042;cam.pitch=Math.max(-1.2,Math.min(1.45,cam.pitch+dy*.0042));}
-    $('#tip').hidden=true;
-  }else if(e.pointerType==='mouse')hover={x:e.clientX,y:e.clientY};
-});
-const endDrag=e=>{if(!drag)return;const click=Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<=5&&performance.now()-drag.t<450;drag=null;stage.classList.remove('dragging');
-  if(click&&e.type==='pointerup'){const hit=pick(e.clientX,e.clientY);if(hit)openLB(hit);}};
-stage.addEventListener('pointerup',endDrag);stage.addEventListener('pointercancel',endDrag);
-stage.addEventListener('pointerleave',()=>{hover=null;$('#tip').hidden=true;stage.classList.remove('over');});
-const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
-function pick(cx,cy){
-  const r=renderer.domElement.getBoundingClientRect();ndc.set((cx-r.left)/r.width*2-1,-(cy-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);
-  for(const h of ray.intersectObjects(scene.children.filter(o=>o.isMesh),false)){
-    if(h.object.material&&h.object.material.blending===THREE.AdditiveBlending)continue;
-    const S=h.object.userData.S;if(!S||!h.uv)return null;
-    const px=h.uv.x*S.W,py=(1-h.uv.y)*S.H;
-    for(const g of S.regions)if(px>=g.x&&px<=g.x+g.w&&py>=g.y&&py<=g.y+g.h)return g.n;
-    return null;
   }
-  return null;
-}
-
-/* ---------- lightbox ---------- */
-let order=[],lbIdx=0;
-function openLB(n){lbIdx=Math.max(0,order.indexOf(n));showLB();$('#lb').hidden=false;$('#lbclose').focus();for(const k in keys)keys[k]=false;}
-function showLB(){const n=order[lbIdx];$('#lbimg').src='img/'+n+'.jpg';$('#lbimg').alt='Wall painting, photograph IMG_'+n;$('#lbcap').innerHTML=`IMG_${n}&nbsp;&nbsp;${lbIdx+1} / ${order.length}`;}
-function stepLB(d){lbIdx=(lbIdx+d+order.length)%order.length;showLB();}
-function closeLB(){$('#lb').hidden=true;}
-$('#lbclose').addEventListener('click',closeLB);$('#lbprev').addEventListener('click',()=>stepLB(-1));$('#lbnext').addEventListener('click',()=>stepLB(1));
-$('#lb').addEventListener('click',e=>{if(e.target.id==='lb'||e.target.tagName==='FIGURE')closeLB();});
+});
+const endDrag=()=>{if(!drag)return;drag=null;stage.classList.remove('dragging');};
+stage.addEventListener('pointerup',endDrag);stage.addEventListener('pointercancel',endDrag);
+/* ---------- song ---------- */
+$('#play').addEventListener('click',()=>{const box=$('#player'),on=box.hidden;box.hidden=!on;$('#play').textContent=on?'Stop':'Play';$('#play').setAttribute('aria-pressed',on);
+  box.innerHTML=on?'<iframe src="https://www.youtube-nocookie.com/embed/VmxdXzQeJ7c?start=154&autoplay=1&rel=0" title="Salve regina" allow="autoplay; encrypted-media" allowfullscreen></iframe>':'';});
 
 /* ---------- loop ---------- */
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?78:64;camera.updateProjectionMatrix();}
 addEventListener('resize',resize);
 const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-let last=performance.now(),hoverTick=0;
+let last=performance.now();
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;const T=now/1000;
   if(tween){tween.t+=dt/tween.d;const k=ease(Math.min(1,tween.t));for(const p of['x','z','yaw','pitch'])cam[p]=tween.from[p]+(tween.to[p]-tween.from[p])*k;if(tween.t>=1)tween=null;}
@@ -565,15 +516,12 @@ function frame(now){
   for(const c of candles){if(!c)continue;const fl=.82+.1*Math.sin(T*7.3+c.ph)+.06*Math.sin(T*13.1+c.ph*2)+.04*Math.sin(T*23+c.ph);c.pl.intensity=1.1*fl;c.sp.scale.set(.09*fl,.16*(.9+.2*fl),1);c.halo.material.opacity=.2*fl;}
   for(const b of beamMeshes)b.material.uniforms.t.value=T;
   if(dust){const a=dust.pts.geometry.attributes.position;for(let i=0;i<a.count;i++){const p=dust.base[i*2],ph=dust.base[i*2+1];a.setXYZ(i,p.x+Math.sin(T*.13+ph)*.1,p.y+Math.sin(T*.09+ph*1.7)*.15,p.z+Math.cos(T*.11+ph)*.1);}a.needsUpdate=true;}
-  if(hover&&!drag&&$('#lb').hidden&&now-hoverTick>90){hoverTick=now;const n=pick(hover.x,hover.y),tip=$('#tip');
-    if(n){tip.textContent='IMG_'+n;tip.style.left=hover.x+'px';tip.style.top=hover.y+'px';tip.hidden=false;stage.classList.add('over');}else{tip.hidden=true;stage.classList.remove('over');}}
   renderer.render(scene,camera);requestAnimationFrame(frame);
 }
 
 const fontReady=document.fonts?Promise.race([document.fonts.load('80px "cecilia"'),new Promise(r=>setTimeout(r,2500))]):Promise.resolve();
 Promise.all([load(),fontReady]).then(()=>{setTimeout(()=>{
   build();
-  const seen=new Set();for(const m of paintable)for(const g of m.userData.S.regions)if(!seen.has(g.n)){seen.add(g.n);order.push(g.n);}
   resize();requestAnimationFrame(t=>{last=t;frame(t);});
   $('#loader').classList.add('done');setTimeout(()=>$('#loader').hidden=true,1100);
 },30);});
