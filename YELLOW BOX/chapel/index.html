@@ -356,7 +356,7 @@ function chancelColumns(){
 
 function mat(S,side){return new THREE.MeshLambertMaterial({map:tex(S),side:side||THREE.FrontSide});}
 function add(geo,material){const m=new THREE.Mesh(geo,material);scene.add(m);return m;}
-let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null;
+let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null,car=null;
 
 function build(){
   const nw=G.nw,L=G.L,Hw=G.wallH,A=G.arch,P=G.ap,O=G.out,D=G.door,DS=THREE.DoubleSide;
@@ -413,6 +413,17 @@ function build(){
   if(CROSS){const cols=16,rows=13,t=tex(CROSS);t.repeat.set(1/cols,1/rows);t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;
     const h=.7,m=add(new THREE.PlaneGeometry(h*170/200,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
     m.position.set(0,1.72,G.altarZ);cross={m,t,cols,rows,n:195,y:1.72};}
+
+  /* the car from the video, turning as filmed, floating in the middle of the nave; the clip carries its
+     colour above and its cut-out below, and is shown exactly as filmed (no lighting, no tone mapping) */
+  {const v=document.createElement('video');v.src='img/car.mp4';v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='auto';
+    v.play().catch(()=>{});addEventListener('pointerdown',()=>{if(v.paused)v.play().catch(()=>{});});
+    const t=new THREE.VideoTexture(v);t.minFilter=THREE.LinearFilter;t.generateMipmaps=false;
+    const mat=new THREE.ShaderMaterial({uniforms:{map:{value:t}},transparent:true,depthWrite:false,side:THREE.DoubleSide,
+      vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader:'uniform sampler2D map;varying vec2 vUv;void main(){float a=texture2D(map,vec2(vUv.x,vUv.y*.5)).r;if(a<.02)discard;gl_FragColor=vec4(texture2D(map,vec2(vUv.x,.5+vUv.y*.5)).rgb,a);}'});
+    const w=5.4,h=2.72,m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+    m.position.set(0,1.9+h/2,-L/2);scene.add(m);car={m,y:1.9+h/2};}
 
   /* slit windows and their light */
   const wmat=new THREE.MeshBasicMaterial({color:'#fffaf0',side:DS});
@@ -530,6 +541,7 @@ function frame(now){
   const bob=(f||s)?Math.sin(T*9)*.012:0;
   camera.position.set(cam.x,cam.y+bob,cam.z);camera.rotation.set(cam.pitch,cam.yaw,0);
   if(lantern)lantern.position.set(cam.x,cam.y+.3,cam.z);
+  if(car){car.m.position.y=car.y+Math.sin(T*.5)*.05;car.m.rotation.y=Math.atan2(cam.x-car.m.position.x,cam.z-car.m.position.z);}
   if(cross){const i=Math.floor(T*25)%cross.n;cross.t.offset.set((i%cross.cols)/cross.cols,1-(Math.floor(i/cross.cols)+1)/cross.rows);
     cross.m.position.y=cross.y+Math.sin(T*.7)*.06;cross.m.rotation.y=Math.atan2(cam.x-cross.m.position.x,cam.z-cross.m.position.z);}
   for(const c of candles){if(!c)continue;const fl=.82+.1*Math.sin(T*7.3+c.ph)+.06*Math.sin(T*13.1+c.ph*2)+.04*Math.sin(T*23+c.ph);c.pl.intensity=1.1*fl;c.sp.scale.set(.09*fl,.16*(.9+.2*fl),1);c.halo.material.opacity=.2*fl;}
