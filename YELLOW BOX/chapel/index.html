@@ -422,7 +422,7 @@ function build(){
     const mat=new THREE.ShaderMaterial({uniforms:{map:{value:t}},transparent:true,depthWrite:false,side:THREE.DoubleSide,
       vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
       fragmentShader:'uniform sampler2D map;varying vec2 vUv;void main(){float a=texture2D(map,vec2(vUv.x,vUv.y*.5)).r;if(a<.02)discard;gl_FragColor=vec4(texture2D(map,vec2(vUv.x,.5+vUv.y*.5)).rgb,a);}'});
-    const w=5.4,h=2.72,m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+    const w=5.38,h=2.45,m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
     m.position.set(0,1.9+h/2,-L/2);scene.add(m);car={m,y:1.9+h/2};}
 
   /* slit windows and their light */
