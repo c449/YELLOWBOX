@@ -35,12 +35,7 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
 .pad svg{width:14px;height:14px;fill:var(--white)}
 .pad .up{grid-column:2;grid-row:1}.pad .lt{grid-column:1;grid-row:2}.pad .dn{grid-column:2;grid-row:2}.pad .rt{grid-column:3;grid-row:2}
 @media (pointer:coarse){.pad{display:grid}}
-.loader{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:8px;background:var(--black);transition:opacity 1s ease;z-index:5;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.loader.done{opacity:0;pointer-events:none}
-.loader .lt1{font-family:var(--head);font-weight:400;font-size:3rem;line-height:1;margin:0}
 .fail{position:fixed;inset:0;display:flex;align-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px))}
-@media (prefers-reduced-motion:reduce){.loader{transition:none}}
 </style>
 
 <div id="stage" aria-label="3D chapel"></div>
@@ -57,10 +52,6 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
   <button class="lt" data-mv="l" aria-label="Left"><svg viewBox="0 0 10 10"><path d="M1 5 9 1v8z"/></svg></button>
   <button class="dn" data-mv="b" aria-label="Back"><svg viewBox="0 0 10 10"><path d="M5 9 1 1h8z"/></svg></button>
   <button class="rt" data-mv="r" aria-label="Right"><svg viewBox="0 0 10 10"><path d="M9 5 1 9V1z"/></svg></button>
-</div>
-
-<div class="loader" id="loader">
-  <p class="lt1">CC Chapel</p>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -296,7 +287,7 @@ function worldBox(w,h,d,unit){const g=new THREE.BoxGeometry(w,h,d),uv=g.attribut
 const stage=$('#stage');
 let renderer;
 try{renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});}catch(e){fail();return;}
-function fail(){$('#loader').hidden=true;const d=document.createElement('div');d.className='fail';d.innerHTML='<p>WEBGL IS OFF IN THIS BROWSER.</p>';document.body.appendChild(d);}
+function fail(){const d=document.createElement('div');d.className='fail';d.innerHTML='<p>WEBGL IS OFF IN THIS BROWSER.</p>';document.body.appendChild(d);}
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
 renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
 stage.appendChild(renderer.domElement);
@@ -411,10 +402,10 @@ function build(){
 
   chancelColumns();
 
-  /* the turning cross from the GIF, floating over the middle of the nave; 195 frames on a 16 x 13 sheet */
+  /* the turning cross from the GIF, small, floating just above the altar slab; 195 frames on a 16 x 13 sheet */
   if(CROSS){const cols=16,rows=13,t=tex(CROSS);t.repeat.set(1/cols,1/rows);t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;
-    const h=2.4,m=add(new THREE.PlaneGeometry(h*170/200,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
-    m.position.set(0,1.65,-L/2);cross={m,t,cols,rows,n:195,y:1.65};}
+    const h=.7,m=add(new THREE.PlaneGeometry(h*170/200,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
+    m.position.set(0,1.72,G.altarZ);cross={m,t,cols,rows,n:195,y:1.72};}
 
   /* slit windows and their light */
   const wmat=new THREE.MeshBasicMaterial({color:'#fffaf0',side:DS});
@@ -456,10 +447,6 @@ function build(){
   // slits seen from outside
   const slitOut=new THREE.MeshBasicMaterial({color:'#1f1d1a',side:DS});
   south.windows.forEach(xm=>{const g=add(slitGeo(.12,1.0),slitOut);g.rotation.y=PI/2;g.position.set(O.hw+.006,2.25,-L+xm);});
-  // ground, path, sky
-  const gt=tex(groundTex(),[60,60]);
-  m=add(new THREE.PlaneGeometry(240,240),new THREE.MeshBasicMaterial({map:gt,color:new THREE.Color(.9,.9,.9)}));m.rotation.x=-PI/2;m.position.y=-.012;
-  const sky=new THREE.Mesh(new THREE.SphereGeometry(150,32,16),new THREE.MeshBasicMaterial({map:tex(skyTex()),side:THREE.BackSide,fog:false}));scene.add(sky);
 
   scene.add(new THREE.AmbientLight('#ebe8e1',.42));
   scene.add(new THREE.HemisphereLight('#f6f4ef','#2e2b27',.3));
@@ -471,7 +458,7 @@ const STATIONS={outside:{x:8.5,z:9,yaw:.6,pitch:.13},door:{x:0,z:-.8,yaw:0,pitch
 const cam=Object.assign({y:1.6},STATIONS.outside);
 function inBuilding(x,z){return(Math.abs(x)<G.out.hw+.35&&z<G.out.front+.35&&z>G.arch.z1)||(Math.abs(x)<G.out.apHw+.35&&z<=G.arch.z1&&z>G.out.apBack-.35);}
 function allowed(x,z){
-  if(Math.abs(x)<=2.0&&z<=-.35&&z>=-10.7)return Math.hypot(x,z+G.L/2)>.55;   // nave, around the floating cross
+  if(Math.abs(x)<=2.0&&z<=-.35&&z>=-10.7)return true;            // nave
   if(Math.abs(x)<=.7&&z<-10.7&&z>=-11.95)return true;             // under the arch
   if(Math.abs(x)<=1.05&&z<-11.95&&z>=G.altarZ+.55)return true;    // apse
   if(Math.abs(x)<=.45&&z>-.36&&z<=G.out.front+.4)return true;     // doorway
@@ -530,7 +517,7 @@ function frame(now){
   const ty=1.6+(cam.z<G.ap.z0&&Math.abs(cam.x)<1.4?G.step:0);cam.y+=(ty-cam.y)*Math.min(1,dt*8);
   const bob=(f||s)?Math.sin(T*9)*.012:0;
   camera.position.set(cam.x,cam.y+bob,cam.z);camera.rotation.set(cam.pitch,cam.yaw,0);
-  lantern.position.set(cam.x,cam.y+.3,cam.z);
+  if(lantern)lantern.position.set(cam.x,cam.y+.3,cam.z);
   if(cross){const i=Math.floor(T*25)%cross.n;cross.t.offset.set((i%cross.cols)/cross.cols,1-(Math.floor(i/cross.cols)+1)/cross.rows);
     cross.m.position.y=cross.y+Math.sin(T*.7)*.06;cross.m.rotation.y=Math.atan2(cam.x-cross.m.position.x,cam.z-cross.m.position.z);}
   for(const c of candles){if(!c)continue;const fl=.82+.1*Math.sin(T*7.3+c.ph)+.06*Math.sin(T*13.1+c.ph*2)+.04*Math.sin(T*23+c.ph);c.pl.intensity=1.1*fl;c.sp.scale.set(.09*fl,.16*(.9+.2*fl),1);c.halo.material.opacity=.2*fl;}
@@ -540,10 +527,12 @@ function frame(now){
 }
 
 const fontReady=document.fonts?Promise.race([document.fonts.load('80px "cecilia"'),new Promise(r=>setTimeout(r,2500))]):Promise.resolve();
-Promise.all([load(),fontReady]).then(()=>{setTimeout(()=>{
-  build();
-  resize();requestAnimationFrame(t=>{last=t;frame(t);});
-  $('#loader').classList.add('done');setTimeout(()=>$('#loader').hidden=true,1100);
-},30);});
+// the empty landscape shows at once; the church appears in it when the paintings have loaded
+function land(){
+  const m=add(new THREE.PlaneGeometry(240,240),new THREE.MeshBasicMaterial({map:tex(groundTex(),[60,60]),color:new THREE.Color(.9,.9,.9)}));m.rotation.x=-PI/2;m.position.y=-.012;
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(150,32,16),new THREE.MeshBasicMaterial({map:tex(skyTex()),side:THREE.BackSide,fog:false})));
+}
+land();resize();requestAnimationFrame(t=>{last=t;frame(t);});
+Promise.all([load(),fontReady]).then(()=>setTimeout(build,30));
 })();
 </script>
