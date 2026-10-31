@@ -38,8 +38,8 @@ button:focus-visible{outline:2px solid var(--white);outline-offset:-2px}
 button[aria-pressed="true"]{background:var(--white);color:var(--black)}
 .pad{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));
   display:none;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:2px}
-.pad button{padding:0;display:grid;place-items:center;touch-action:none}
-.pad svg{width:14px;height:14px;fill:var(--white)}
+.pad button{padding:0;display:grid;place-items:center;touch-action:none;background:none}
+.pad svg{width:22px;height:22px;fill:var(--black)}
 .pad .up{grid-column:2;grid-row:1}.pad .lt{grid-column:1;grid-row:2}.pad .dn{grid-column:2;grid-row:2}.pad .rt{grid-column:3;grid-row:2}
 @media (pointer:coarse){.pad{display:grid}}
 .fail{position:fixed;inset:0;display:flex;align-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px))}
