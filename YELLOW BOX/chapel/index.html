@@ -19,7 +19,8 @@ body{background:var(--black);color:var(--white);font-family:var(--base);font-wei
 .chrome{position:fixed;left:0;top:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px;
   padding-top:calc(16px + env(safe-area-inset-top,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1{font-family:var(--head);font-weight:400;font-size:2rem;line-height:1;margin:0;padding:.3rem .5rem;background:var(--black);color:var(--white)}
-#player iframe{display:block;width:356px;max-width:calc(100vw - 32px);height:200px;border:0;background:var(--black)}
+#player{position:fixed;left:-10000px;top:0;width:200px;height:200px;overflow:hidden}
+#player iframe{width:200px;height:200px;border:0}
 button{font-family:var(--base);font-weight:700;font-size:.8rem;text-transform:uppercase;color:var(--white);background:var(--black);border:0;border-radius:0;padding:.5rem .6rem;cursor:pointer;line-height:1}
 button:focus-visible{outline:2px solid var(--white);outline-offset:-2px}
 button[aria-pressed="true"]{background:var(--white);color:var(--black)}
@@ -42,7 +43,7 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
 <header class="chrome">
   <h1>CC Chapel</h1>
   <button id="play" aria-pressed="false">Play</button>
-  <div id="player" hidden></div>
+  <div id="player" aria-hidden="true"></div>
 </header>
 
 <div class="pad" aria-label="Walk">
@@ -492,8 +493,14 @@ stage.addEventListener('pointermove',e=>{
 const endDrag=()=>{if(!drag)return;drag=null;stage.classList.remove('dragging');};
 stage.addEventListener('pointerup',endDrag);stage.addEventListener('pointercancel',endDrag);
 /* ---------- song ---------- */
-$('#play').addEventListener('click',()=>{const box=$('#player'),on=box.hidden;box.hidden=!on;$('#play').textContent=on?'Stop':'Play';$('#play').setAttribute('aria-pressed',on);
-  box.innerHTML=on?'<iframe src="https://www.youtube-nocookie.com/embed/VmxdXzQeJ7c?start=154&autoplay=1&rel=0" title="Salve regina" allow="autoplay; encrypted-media" allowfullscreen></iframe>':'';});
+// Salve regina from 2:34; the video stays off screen, the button plays and pauses it
+let song=null,playing=false;
+$('#play').addEventListener('click',()=>{
+  playing=!playing;$('#play').textContent=playing?'Pause':'Play';$('#play').setAttribute('aria-pressed',playing);
+  if(!song){song=document.createElement('iframe');song.title='Salve regina';song.allow='autoplay; encrypted-media';song.tabIndex=-1;
+    song.src='https://www.youtube-nocookie.com/embed/VmxdXzQeJ7c?start=154&autoplay=1&enablejsapi=1&rel=0&controls=0';$('#player').appendChild(song);return;}
+  song.contentWindow.postMessage(JSON.stringify({event:'command',func:playing?'playVideo':'pauseVideo',args:[]}),'*');
+});
 
 /* ---------- loop ---------- */
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?78:64;camera.updateProjectionMatrix();}
