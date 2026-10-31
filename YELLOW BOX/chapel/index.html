@@ -462,7 +462,7 @@ function build(){
 }
 
 /* ---------- movement ---------- */
-const STATIONS={outside:{x:8.5,z:9,yaw:.6,pitch:.13},door:{x:0,z:-.8,yaw:0,pitch:.05},north:{x:1.3,z:-5.5,yaw:PI/2,pitch:.1},south:{x:-1.3,z:-5.5,yaw:-PI/2,pitch:.1},apse:{x:0,z:-9.3,yaw:0,pitch:.1},vault:{x:0,z:-5.5,yaw:0,pitch:1.3}};
+const STATIONS={outside:{x:0,z:14,yaw:0,pitch:.15},door:{x:0,z:-.8,yaw:0,pitch:.05},north:{x:1.3,z:-5.5,yaw:PI/2,pitch:.1},south:{x:-1.3,z:-5.5,yaw:-PI/2,pitch:.1},apse:{x:0,z:-9.3,yaw:0,pitch:.1},vault:{x:0,z:-5.5,yaw:0,pitch:1.3}};
 const cam=Object.assign({y:1.6},STATIONS.outside);
 function inBuilding(x,z){return(Math.abs(x)<G.out.hw+.35&&z<G.out.front+.35&&z>G.arch.z1)||(Math.abs(x)<G.out.apHw+.35&&z<=G.arch.z1&&z>G.out.apBack-.35);}
 function allowed(x,z){
