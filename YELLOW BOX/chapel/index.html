@@ -21,8 +21,9 @@ body{background:var(--black);color:var(--white);font-family:var(--base);font-wei
 h1{font-family:var(--head);font-weight:400;font-size:2rem;line-height:1;margin:0;padding:.3rem 0;color:var(--black)}
 #player{position:fixed;left:-10000px;top:0;width:200px;height:200px;overflow:hidden}
 #player iframe{width:200px;height:200px;border:0}
-#play{background:none;padding:0;color:var(--black)}
-#play svg{display:block;width:28px;height:28px;fill:currentColor}
+#play{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:48px;height:48px;padding:0;display:grid;place-items:center}
+@media (pointer:coarse){#play{left:calc(max(16px,env(safe-area-inset-left,0px)) + 152px)}}
+#play svg{display:block;width:22px;height:22px;fill:currentColor}
 #play .w,#play .x{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 #play .w{display:none}#play[aria-pressed="true"] .w{display:inline}#play[aria-pressed="true"] .x{display:none}
 button{font-family:var(--base);font-weight:700;font-size:.8rem;text-transform:uppercase;color:var(--white);background:var(--black);border:0;border-radius:0;padding:.5rem .6rem;cursor:pointer;line-height:1}
@@ -46,9 +47,10 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
 
 <header class="chrome">
   <h1>CC Chapel</h1>
-  <button id="play" aria-pressed="false" aria-label="Play music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z"/><path class="w" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="x" d="M16 9l6 6M22 9l-6 6"/></svg></button>
   <div id="player" aria-hidden="true"></div>
 </header>
+
+<button id="play" aria-pressed="false" aria-label="Play music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z"/><path class="w" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="x" d="M16 9l6 6M22 9l-6 6"/></svg></button>
 
 <div class="pad" aria-label="Walk">
   <button class="up" data-mv="f" aria-label="Forward"><svg viewBox="0 0 10 10"><path d="M5 1 9 9H1z"/></svg></button>
