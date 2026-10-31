@@ -30,7 +30,6 @@ h1{font-family:var(--head);font-weight:400;font-size:2rem;line-height:1;margin:0
 #player{position:fixed;left:-10000px;top:0;width:200px;height:200px;overflow:hidden}
 #player iframe{width:200px;height:200px;border:0}
 #play{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:48px;height:48px;padding:0;display:grid;place-items:center;background:none;color:var(--black)}
-@media (pointer:coarse){#play{left:calc(max(16px,env(safe-area-inset-left,0px)) + 152px)}}
 #play svg{display:block;width:22px;height:22px;fill:currentColor}
 #play .w,#play .x{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 #play .w{display:none}#play[aria-pressed="true"] .w{display:inline}#play[aria-pressed="true"] .x{display:none}
@@ -44,6 +43,7 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
 .pad .up{grid-column:2;grid-row:1}.pad .lt{grid-column:1;grid-row:2}.pad .dn{grid-column:2;grid-row:2}.pad .rt{grid-column:3;grid-row:2}
 @media (pointer:coarse){.pad{display:grid}}
 .fail{position:fixed;inset:0;display:flex;align-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px))}
+@media (pointer:coarse){#play{left:calc(max(16px,env(safe-area-inset-left,0px)) + 156px);width:60px;height:60px;bottom:calc(10px + env(safe-area-inset-bottom,0px))}#play svg{width:40px;height:40px}}
 </style>
 
 <div id="stage" aria-label="3D chapel"></div>
