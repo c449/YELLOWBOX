@@ -62,6 +62,7 @@ button[aria-pressed="true"]{background:var(--white);color:var(--black)}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (function(){
 'use strict';
@@ -235,7 +236,7 @@ function endWall(kind){
   }else{
     paint(S,'6737',X(-2.3),Y(3.4),1.62*ppm,2.6*ppm,{cover:true,top:true});
     paint(S,'6696',X(.68),Y(3.4),1.62*ppm,2.6*ppm,{cover:true,top:true});
-    paint(S,'6778',X(-1.6),Y(5.5),3.2*ppm,1.8*ppm,{crop:[0,.47,1,1],cover:true});
+    paint(S,'6778',X(-1.6),Y(4.6),3.2*ppm,.95*ppm,{crop:[0,.47,1,1],cover:true});   // below the round window
   }
   age(S);return S;
 }
@@ -356,7 +357,7 @@ function chancelColumns(){
 
 function mat(S,side){return new THREE.MeshLambertMaterial({map:tex(S),side:side||THREE.FrontSide});}
 function add(geo,material){const m=new THREE.Mesh(geo,material);scene.add(m);return m;}
-let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null,car=null;
+let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null,CARBOX=null,ENV=null;
 
 function build(){
   const nw=G.nw,L=G.L,Hw=G.wallH,A=G.arch,P=G.ap,O=G.out,D=G.door,DS=THREE.DoubleSide;
@@ -373,7 +374,9 @@ function build(){
   const E=endWall('east');
   m=add(shapeGeo(wallShape(nw,Hw,nw,{r:A.ro,cy:A.cy,ext:A.ext}),-nw,0,2*nw,Hw+nw),mat(E),E);m.position.z=A.z0;
   const W=endWall('west');
-  m=add(shapeGeo(wallShape(nw,Hw,nw,D),-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;
+  // round window high in the west wall, above the door
+  const OC={y:5.0,r:.32},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
+  {const ws=wallShape(nw,Hw,nw,D);ws.holes.push(oculus());m=add(shapeGeo(ws,-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;}
 
   /* stepped horseshoe arch */
   add(reveal(A.ro,A.cy,A.ext,A.z0,A.zs),stoneIn);
@@ -414,20 +417,24 @@ function build(){
     const h=.7,m=add(new THREE.PlaneGeometry(h*170/200,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
     m.position.set(0,1.72,G.altarZ);cross={m,t,cols,rows,n:195,y:1.72};}
 
-  /* the car from the video on its checkered floor, standing in the middle of the nave, front to the door.
-     The video is a full turntable (one turn in 540 frames); 144 of its views, one every 2.5 degrees, sit on two
-     sheets at near the video's own sharpness, and the car shows the one view that matches where you stand.
-     Scale: the car is 4.27 m long; its floor reaches almost wall to wall and you can step onto it beside the car. */
-  {const cols=6,rows=12,per=72,n=144,ppm=708/4.27,w=848/ppm,h=371/ppm,ground=362;   // ground = the near edge of the checkered floor
-    const sheet=k=>{const t=new THREE.TextureLoader().load('img/car-views-'+k+'.webp');t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;return t;};
-    // shown exactly as filmed: the sheet's colours go straight to the screen
-    const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
-      uniforms:{m0:{value:sheet(0)},m1:{value:sheet(1)},sel:{value:0},o:{value:new THREE.Vector2()},rep:{value:new THREE.Vector2(1/cols,1/rows)}},
-      vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader:'uniform sampler2D m0,m1;uniform vec2 o,rep;uniform float sel;varying vec2 vUv;'+
-        'void main(){vec2 u=o+vUv*rep*.998+rep*.001;vec4 c=sel<.5?texture2D(m0,u):texture2D(m1,u);if(c.a<.02)discard;gl_FragColor=c;}'});
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
-    m.position.set(0,h/2-(371-ground)/ppm,-L/2);scene.add(m);car={m,mat,cols,rows,per,n};}
+  /* the car: the real 3D model (lambo.glb, lightened), standing on its own checkered floor in the middle of
+     the nave, front to the door. Scaled so the car is 4.27 m long. */
+  {const scale0=1;new THREE.GLTFLoader().load('img/car-lite.glb',g=>{
+    const root=g.scene,floorParts=[],carParts=[];
+    root.traverse(o=>{if(o.isMesh){(o.name.indexOf('Cubo')===0||o.parent&&o.parent.name.indexOf('Cubo')===0?floorParts:carParts).push(o);}});
+    root.updateMatrixWorld(true);
+    const bc=new THREE.Box3();carParts.forEach(o=>bc.expandByObject(o));
+    const eyes=root.getObjectByName('OJOS_remesh'),ce=new THREE.Vector3(),cb=bc.getCenter(new THREE.Vector3());
+    if(eyes)new THREE.Box3().setFromObject(eyes).getCenter(ce);
+    // turn the car so its eyes face the door (+z)
+    const dir=Math.atan2(ce.x-cb.x,ce.z-cb.z);const piv=new THREE.Group();piv.add(root);root.rotation.y=-dir;piv.updateMatrixWorld(true);
+    const b2=new THREE.Box3();carParts.forEach(o=>b2.expandByObject(o));const len=b2.max.z-b2.min.z,k=4.27/len;
+    piv.scale.setScalar(k);piv.updateMatrixWorld(true);
+    const all=new THREE.Box3().setFromObject(piv),c2=all.getCenter(new THREE.Vector3());
+    piv.position.set(-c2.x,-all.min.y,-L/2-c2.z);scene.add(piv);piv.updateMatrixWorld(true);
+    const bb=new THREE.Box3();carParts.forEach(o=>bb.expandByObject(o));CARBOX={x0:bb.min.x,x1:bb.max.x,z0:bb.min.z,z1:bb.max.z};
+    carParts.concat(floorParts).forEach(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial){m.envMap=ENV;m.envMapIntensity=1;m.needsUpdate=true;}});
+  });}
 
   /* slit windows and their light */
   const wmat=new THREE.MeshBasicMaterial({color:'#fffaf0',side:DS});
@@ -446,7 +453,7 @@ function build(){
   const ext=k=>new THREE.MeshBasicMaterial({map:tex(T,[1/1.6,1/1.6]),color:new THREE.Color(k,k,k)});
   const extW=k=>new THREE.MeshBasicMaterial({map:stoneT(),color:new THREE.Color(k,k,k)});
   // west front: tall gable with a bell opening, horseshoe door
-  {const s=new THREE.Shape();s.moveTo(-O.hw,0);hsPath(s,D.r,D.cy,D.ext);s.lineTo(O.hw,0);s.lineTo(O.hw,5.0);s.lineTo(0,8.2);s.lineTo(-O.hw,5.0);s.lineTo(-O.hw,0);
+  {const s=new THREE.Shape();s.moveTo(-O.hw,0);hsPath(s,D.r,D.cy,D.ext);s.lineTo(O.hw,0);s.lineTo(O.hw,5.0);s.lineTo(0,8.2);s.lineTo(-O.hw,5.0);s.lineTo(-O.hw,0);s.holes.push(oculus());
     const h=new THREE.Path();h.moveTo(-.3,6.35);h.lineTo(.3,6.35);h.lineTo(.3,7.05);h.absarc(0,7.05,.3,0,PI,false);h.lineTo(-.3,6.35);s.holes.push(h);
     const g=new THREE.ExtrudeGeometry(s,{depth:O.front,bevelEnabled:false,curveSegments:24});add(g,ext(.86));}
   const sideLen=O.front-A.z1+0,sideZ=(0+A.z1)/2;
@@ -470,6 +477,9 @@ function build(){
   const slitOut=new THREE.MeshBasicMaterial({color:'#1f1d1a',side:DS});
   south.windows.forEach(xm=>{const g=add(slitGeo(.12,1.0),slitOut);g.rotation.y=PI/2;g.position.set(O.hw+.006,2.25,-L+xm);});
 
+  {const c=mk(64,256),x=c.getContext('2d'),g=x.createLinearGradient(0,0,0,256);g.addColorStop(0,'#f4f1ea');g.addColorStop(.5,'#d9d5cc');g.addColorStop(.55,'#8e8a82');g.addColorStop(1,'#4c4944');x.fillStyle=g;x.fillRect(0,0,64,256);
+    const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;t.encoding=THREE.sRGBEncoding;
+    const pm=new THREE.PMREMGenerator(renderer);ENV=pm.fromEquirectangular(t).texture;pm.dispose();}
   scene.add(new THREE.AmbientLight('#ebe8e1',.42));
   scene.add(new THREE.HemisphereLight('#f6f4ef','#2e2b27',.3));
   lantern=new THREE.PointLight('#ffeacc',.5,7,1.4);scene.add(lantern);
@@ -480,7 +490,7 @@ const STATIONS={outside:{x:0,z:14,yaw:0,pitch:.15},door:{x:0,z:-.8,yaw:0,pitch:.
 const cam=Object.assign({y:1.6},STATIONS.outside);
 function inBuilding(x,z){return(Math.abs(x)<G.out.hw+.35&&z<G.out.front+.35&&z>G.arch.z1)||(Math.abs(x)<G.out.apHw+.35&&z<=G.arch.z1&&z>G.out.apBack-.35);}
 function allowed(x,z){
-  if(Math.abs(x)<=2.0&&z<=-.35&&z>=-10.7)return !(Math.abs(x)<1.1&&Math.abs(z+G.L/2)<2.15);   // nave, around the car itself
+  if(Math.abs(x)<=2.0&&z<=-.35&&z>=-10.7)return !(CARBOX&&x>CARBOX.x0-.15&&x<CARBOX.x1+.15&&z>CARBOX.z0-.15&&z<CARBOX.z1+.15);   // nave, around the car
   if(Math.abs(x)<=.7&&z<-10.7&&z>=-11.95)return true;             // under the arch
   if(Math.abs(x)<=1.05&&z<-11.95&&z>=G.altarZ+.55)return true;    // apse
   if(Math.abs(x)<=.45&&z>-.36&&z<=G.out.front+.4)return true;     // doorway
@@ -545,8 +555,6 @@ function frame(now){
   const bob=(f||s)?Math.sin(T*9)*.012:0;
   camera.position.set(cam.x,cam.y+bob,cam.z);camera.rotation.set(cam.pitch,cam.yaw,0);
   if(lantern)lantern.position.set(cam.x,cam.y+.3,cam.z);
-  if(car){const a=Math.atan2(cam.x-car.m.position.x,cam.z-car.m.position.z),i=((Math.round(a/(2*PI)*car.n)%car.n)+car.n)%car.n,j=i%car.per,u=car.mat.uniforms;
-    u.sel.value=i<car.per?0:1;u.o.value.set((j%car.cols)/car.cols,1-(Math.floor(j/car.cols)+1)/car.rows);car.m.rotation.y=a;}
   if(cross){const i=Math.floor(T*25)%cross.n;cross.t.offset.set((i%cross.cols)/cross.cols,1-(Math.floor(i/cross.cols)+1)/cross.rows);
     cross.m.position.y=cross.y+Math.sin(T*.7)*.06;cross.m.rotation.y=Math.atan2(cam.x-cross.m.position.x,cam.z-cross.m.position.z);}
   for(const c of candles){if(!c)continue;const fl=.82+.1*Math.sin(T*7.3+c.ph)+.06*Math.sin(T*13.1+c.ph*2)+.04*Math.sin(T*23+c.ph);c.pl.intensity=1.1*fl;c.sp.scale.set(.09*fl,.16*(.9+.2*fl),1);c.halo.material.opacity=.2*fl;}
