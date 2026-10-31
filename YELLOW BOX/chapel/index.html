@@ -356,7 +356,7 @@ function chancelColumns(){
 
 function mat(S,side){return new THREE.MeshLambertMaterial({map:tex(S),side:side||THREE.FrontSide});}
 function add(geo,material){const m=new THREE.Mesh(geo,material);scene.add(m);return m;}
-let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null;
+let candles=[],beamMeshes=[],dust=null,lantern=null,cross=null,car=null;
 
 function build(){
   const nw=G.nw,L=G.L,Hw=G.wallH,A=G.arch,P=G.ap,O=G.out,D=G.door,DS=THREE.DoubleSide;
@@ -414,23 +414,20 @@ function build(){
     const h=.7,m=add(new THREE.PlaneGeometry(h*170/200,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
     m.position.set(0,1.72,G.altarZ);cross={m,t,cols,rows,n:195,y:1.72};}
 
-  /* the car on a checkered floor in the middle of the nave. The floor is built, not filmed: 16 x 8 squares of
-     30 cm, black and white, 6 cm thick, centred under the car. The car is fixed and does not turn: its straight
-     front (first frame of the video) faces the door and its straight rear (frame 274) faces the altar, cut by hand,
-     shown exactly as filmed; the car is 4.27 m long and its wheels stand on the squares. */
-  {const sq=.3,nx=8,nz=16,th=.06,fw=nx*sq,fl=nz*sq,ppx=100;
-    const c=mk(nx*ppx,nz*ppx),x=c.getContext('2d');
-    for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){x.fillStyle=(i+j)%2?'#141414':'#ececec';x.fillRect(i*ppx,j*ppx,ppx,ppx);}
-    const top=tex(c);top.anisotropy=ANISO;
-    // the edges carry the same squares
-    const edge=(n)=>{const e=mk(n*ppx,Math.round(th/sq*ppx)),y=e.getContext('2d');for(let i=0;i<n;i++){y.fillStyle=i%2?'#0e0e0e':'#d8d8d8';y.fillRect(i*ppx,0,ppx,e.height);}return new THREE.MeshBasicMaterial({map:tex(e)});};
-    const sideL=edge(nz),sideW=edge(nx),topM=new THREE.MeshBasicMaterial({map:top});
-    const fm=new THREE.Mesh(new THREE.BoxGeometry(fw,th,fl),[sideL,sideL,topM,sideW,sideW,sideW]);fm.position.set(0,th/2,-L/2);scene.add(fm);
-    const ppm=708/4.27,w=846/ppm,h=386/ppm;
-    for(const[file,ry,dz,ground]of[['img/car-front.png',0,2.13,322],['img/car-back.png',PI,-2.13,318]]){   // front picture at the front bumper, rear picture at the rear one
-      const t=new THREE.TextureLoader().load(file);t.encoding=THREE.sRGBEncoding;t.anisotropy=ANISO;
-      const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,toneMapped:false}));
-      m.rotation.y=ry;m.position.set(0,th+h/2-(386-ground)/ppm,-L/2+dz);scene.add(m);}}
+  /* the car from the video on its checkered floor, standing in the middle of the nave, front to the door.
+     The video is a full turntable (one turn in 540 frames); 144 of its views, one every 2.5 degrees, sit on two
+     sheets at near the video's own sharpness, and the car shows the one view that matches where you stand.
+     Scale: the car is 4.27 m long; its floor reaches almost wall to wall and you can step onto it beside the car. */
+  {const cols=6,rows=12,per=72,n=144,ppm=708/4.27,w=848/ppm,h=371/ppm,ground=362;   // ground = the near edge of the checkered floor
+    const sheet=k=>{const t=new THREE.TextureLoader().load('img/car-views-'+k+'.webp');t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;return t;};
+    // shown exactly as filmed: the sheet's colours go straight to the screen
+    const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
+      uniforms:{m0:{value:sheet(0)},m1:{value:sheet(1)},sel:{value:0},o:{value:new THREE.Vector2()},rep:{value:new THREE.Vector2(1/cols,1/rows)}},
+      vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader:'uniform sampler2D m0,m1;uniform vec2 o,rep;uniform float sel;varying vec2 vUv;'+
+        'void main(){vec2 u=o+vUv*rep*.998+rep*.001;vec4 c=sel<.5?texture2D(m0,u):texture2D(m1,u);if(c.a<.02)discard;gl_FragColor=c;}'});
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+    m.position.set(0,h/2-(371-ground)/ppm,-L/2);scene.add(m);car={m,mat,cols,rows,per,n};}
 
   /* slit windows and their light */
   const wmat=new THREE.MeshBasicMaterial({color:'#fffaf0',side:DS});
@@ -548,6 +545,8 @@ function frame(now){
   const bob=(f||s)?Math.sin(T*9)*.012:0;
   camera.position.set(cam.x,cam.y+bob,cam.z);camera.rotation.set(cam.pitch,cam.yaw,0);
   if(lantern)lantern.position.set(cam.x,cam.y+.3,cam.z);
+  if(car){const a=Math.atan2(cam.x-car.m.position.x,cam.z-car.m.position.z),i=((Math.round(a/(2*PI)*car.n)%car.n)+car.n)%car.n,j=i%car.per,u=car.mat.uniforms;
+    u.sel.value=i<car.per?0:1;u.o.value.set((j%car.cols)/car.cols,1-(Math.floor(j/car.cols)+1)/car.rows);car.m.rotation.y=a;}
   if(cross){const i=Math.floor(T*25)%cross.n;cross.t.offset.set((i%cross.cols)/cross.cols,1-(Math.floor(i/cross.cols)+1)/cross.rows);
     cross.m.position.y=cross.y+Math.sin(T*.7)*.06;cross.m.rotation.y=Math.atan2(cam.x-cross.m.position.x,cam.z-cross.m.position.z);}
   for(const c of candles){if(!c)continue;const fl=.82+.1*Math.sin(T*7.3+c.ph)+.06*Math.sin(T*13.1+c.ph*2)+.04*Math.sin(T*23+c.ph);c.pl.intensity=1.1*fl;c.sp.scale.set(.09*fl,.16*(.9+.2*fl),1);c.halo.material.opacity=.2*fl;}
