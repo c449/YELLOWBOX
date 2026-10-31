@@ -378,31 +378,9 @@ function build(){
   const OC={y:4.85,r:.64},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
   {const ws=wallShape(nw,Hw,nw,D);ws.holes.push(oculus());m=add(shapeGeo(ws,-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;
     // glass in the round window, set in the middle of the wall's thickness
-    // medieval stained glass: gold centre, eight petals in blue and ruby, green between, a ring of pieces at
-    // the rim; each piece slightly uneven like old glass, held in dark lead
-    const sg=(()=>{const N=1024,c=mk(N,N),x=c.getContext('2d'),R=N/2,cx=R,cy=R;
-      const pane=(path,col)=>{x.save();path();x.clip();x.fillStyle=col;x.fillRect(0,0,N,N);
-        for(let i=0;i<14;i++){const px=rnd()*N,py=rnd()*N,r=N*(.03+rnd()*.12),g=x.createRadialGradient(px,py,0,px,py,r),a=.08+rnd()*.18,w=rnd()<.5?'255,255,255':'0,0,0';g.addColorStop(0,`rgba(${w},${a})`);g.addColorStop(1,`rgba(${w},0)`);x.fillStyle=g;x.fillRect(px-r,py-r,2*r,2*r);}
-        x.restore();x.lineWidth=N*.012;x.strokeStyle='#1b1917';path();x.stroke();};
-      const ring=(r0,r1,a0,a1)=>()=>{x.beginPath();x.arc(cx,cy,r1,a0,a1);x.arc(cx,cy,r0,a1,a0,true);x.closePath();};
-      x.fillStyle='#1b1917';x.fillRect(0,0,N,N);
-      const BLUE='#1d3c9e',RUBY='#9b1b1b',GOLD='#d9a730',GREEN='#2f6b3a',PALE='#d8d2bf';
-      // outer ring: 16 pieces, blue and ruby
-      for(let i=0;i<16;i++){const a0=i/16*PI*2,a1=(i+1)/16*PI*2;pane(ring(R*.80,R*.985,a0,a1),i%2?RUBY:BLUE);}
-      // pale pearls set in the ring
-      for(let i=0;i<16;i++){const a=(i+.5)/16*PI*2;pane(()=>{x.beginPath();x.arc(cx+Math.cos(a)*R*.89,cy+Math.sin(a)*R*.89,R*.045,0,PI*2);},PALE);}
-      // field between ring and petals: green
-      pane(ring(R*.30,R*.80,0,PI*2),GREEN);
-      // eight pointed petals
-      for(let i=0;i<8;i++){const a=i/8*PI*2,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca,r0=R*.24,r1=R*.78,w=R*.17;
-        pane(()=>{x.beginPath();x.moveTo(cx+ca*r0,cy+sa*r0);x.quadraticCurveTo(cx+ca*(r0+r1)/2+px*w,cy+sa*(r0+r1)/2+py*w,cx+ca*r1,cy+sa*r1);x.quadraticCurveTo(cx+ca*(r0+r1)/2-px*w,cy+sa*(r0+r1)/2-py*w,cx+ca*r0,cy+sa*r0);x.closePath();},i%2?RUBY:BLUE);}
-      // gold centre with a pale eye
-      pane(()=>{x.beginPath();x.arc(cx,cy,R*.27,0,PI*2);},GOLD);
-      pane(()=>{x.beginPath();x.arc(cx,cy,R*.09,0,PI*2);},PALE);
-      // lead rim
-      x.lineWidth=N*.03;x.strokeStyle='#1b1917';x.beginPath();x.arc(cx,cy,R*.985,0,PI*2);x.stroke();
-      return c;})();
-    const glass=new THREE.MeshBasicMaterial({map:tex(sg),side:THREE.DoubleSide,toneMapped:false});
+    // stained glass from the Abbey of Saint-Denis, ca. 1140-44 (The Met, 26.218.5, public domain), cut to the circle
+    const sgt=new THREE.TextureLoader().load('img/window-met.jpg');sgt.encoding=THREE.sRGBEncoding;sgt.anisotropy=ANISO;
+    const glass=new THREE.MeshBasicMaterial({map:sgt,side:THREE.DoubleSide,toneMapped:false});
     const gl=add(new THREE.CircleGeometry(OC.r,64),glass);gl.position.set(0,OC.y,.8);
     const fr=add(new THREE.TorusGeometry(OC.r-.015,.025,8,64),new THREE.MeshLambertMaterial({color:'#2a2826'}));fr.position.set(0,OC.y,.8);}
 
