@@ -424,7 +424,7 @@ function build(){
     m.position.set(0,1.72,G.altarZ);cross={m,t,cols,rows,n:195,y:1.72};}
 
   /* the car: the real 3D model (lambo.glb, lightened), standing on the stone floor in the middle of the nave,
-     front to the door; the model's own checkered floor is left out. Scaled so the car is 4.7 m long. */
+     front to the door; the model's own checkered floor is left out. Scaled so the car is 5.1 m long. */
   {const scale0=1;new THREE.GLTFLoader().load('img/car-lite.glb',g=>{
     const root=g.scene,floorParts=[],carParts=[];
     root.traverse(o=>{if(o.isMesh){(o.name.indexOf('Cubo')===0||o.parent&&o.parent.name.indexOf('Cubo')===0?floorParts:carParts).push(o);}});
@@ -434,7 +434,7 @@ function build(){
     if(eyes)new THREE.Box3().setFromObject(eyes).getCenter(ce);
     // turn the car so its eyes face the door (+z)
     const dir=Math.atan2(ce.x-cb.x,ce.z-cb.z);const piv=new THREE.Group();piv.add(root);root.rotation.y=-dir;piv.updateMatrixWorld(true);
-    const b2=new THREE.Box3();carParts.forEach(o=>b2.expandByObject(o));const len=b2.max.z-b2.min.z,k=4.7/len;
+    const b2=new THREE.Box3();carParts.forEach(o=>b2.expandByObject(o));const len=b2.max.z-b2.min.z,k=5.1/len;
     piv.scale.setScalar(k);piv.updateMatrixWorld(true);
     floorParts.forEach(o=>o.visible=false);
     const all=new THREE.Box3();carParts.forEach(o=>all.expandByObject(o));const c2=all.getCenter(new THREE.Vector3());
