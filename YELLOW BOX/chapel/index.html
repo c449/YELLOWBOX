@@ -378,9 +378,8 @@ function build(){
   const OC={y:4.85,r:.64},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
   {const ws=wallShape(nw,Hw,nw,D);ws.holes.push(oculus());m=add(shapeGeo(ws,-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;
     // glass in the round window, set in the middle of the wall's thickness
-    // stained glass: a quatrefoil from an Ornamental Window, France, ca. 1180 (The Met, 26.218.1, public domain), cut to the circle, in one light blue
-    const sgt=new THREE.TextureLoader().load('img/window-met.jpg');sgt.encoding=THREE.sRGBEncoding;sgt.anisotropy=ANISO;
-    const glass=new THREE.MeshBasicMaterial({map:sgt,side:THREE.DoubleSide,toneMapped:false});
+    // plain light blue glass, no pattern
+    const glass=new THREE.MeshBasicMaterial({color:'#bcdcec',side:THREE.DoubleSide,toneMapped:false});
     const gl=add(new THREE.CircleGeometry(OC.r,64),glass);gl.position.set(0,OC.y,.8);
     const fr=add(new THREE.TorusGeometry(OC.r-.015,.025,8,64),new THREE.MeshLambertMaterial({color:'#2a2826'}));fr.position.set(0,OC.y,.8);}
 
