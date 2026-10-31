@@ -378,7 +378,7 @@ function build(){
   const OC={y:4.85,r:.64},oculus=()=>{const h=new THREE.Path();h.absarc(0,OC.y,OC.r,0,PI*2,true);return h;};
   {const ws=wallShape(nw,Hw,nw,D);ws.holes.push(oculus());m=add(shapeGeo(ws,-nw,0,2*nw,Hw+nw),mat(W),W);m.rotation.y=PI;m.position.z=-.01;
     // glass in the round window, set in the middle of the wall's thickness
-    // stained glass from the Abbey of Saint-Denis, ca. 1140-44 (The Met, 26.218.5, public domain), cut to the circle
+    // stained glass: a quatrefoil from an Ornamental Window, France, ca. 1180 (The Met, 26.218.1, public domain), cut to the circle, colours softened
     const sgt=new THREE.TextureLoader().load('img/window-met.jpg');sgt.encoding=THREE.sRGBEncoding;sgt.anisotropy=ANISO;
     const glass=new THREE.MeshBasicMaterial({map:sgt,side:THREE.DoubleSide,toneMapped:false});
     const gl=add(new THREE.CircleGeometry(OC.r,64),glass);gl.position.set(0,OC.y,.8);
@@ -440,7 +440,8 @@ function build(){
     const all=new THREE.Box3();carParts.forEach(o=>all.expandByObject(o));const c2=all.getCenter(new THREE.Vector3());
     piv.position.set(-c2.x,-all.min.y,-L/2-c2.z);scene.add(piv);piv.updateMatrixWorld(true);
     const bb=new THREE.Box3();carParts.forEach(o=>bb.expandByObject(o));CARBOX={x0:bb.min.x,x1:bb.max.x,z0:bb.min.z,z1:bb.max.z};
-    carParts.concat(floorParts).forEach(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial){m.envMap=ENV;m.envMapIntensity=1;m.needsUpdate=true;}});
+    carParts.concat(floorParts).forEach(o=>{const m=o.material;if(m&&m.isMeshStandardMaterial){m.envMap=ENV;m.envMapIntensity=1;m.needsUpdate=true;}
+      if(m&&m.name==='LLAMAS'){m.color.set('#050505');m.roughness=.7;m.envMapIntensity=.05;}});   // the blue flames and lightning, black
   });}
 
   /* slit windows and their light */
