@@ -417,8 +417,8 @@ function build(){
   /* the car from the video on its checkered floor, standing in the middle of the nave, front to the door.
      The video is a full turntable (one turn in 540 frames); 72 of its views, one every 5 degrees, sit on one
      sheet, and the car shows the view that matches where you stand, so it reads as an object from every side.
-     Scale: the car is 3.2 m long, so its floor fits the nave with room to walk round it. */
-  {const cols=9,rows=8,n=72,ppm=708/3.2,w=848/ppm,h=371/ppm,ground=362;   // ground = the near edge of the checkered floor
+     Scale: the car is 4.27 m long; its floor reaches almost wall to wall and you can step onto it beside the car. */
+  {const cols=9,rows=8,n=72,ppm=708/4.27,w=848/ppm,h=371/ppm,ground=362;   // ground = the near edge of the checkered floor
     const t=new THREE.TextureLoader().load('img/car-views.webp');t.encoding=THREE.sRGBEncoding;t.repeat.set(1/cols,1/rows);t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;
     const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));
     m.position.set(0,h/2-(371-ground)/ppm,-L/2);scene.add(m);car={m,t,cols,rows,n};}
@@ -474,7 +474,7 @@ const STATIONS={outside:{x:0,z:14,yaw:0,pitch:.15},door:{x:0,z:-.8,yaw:0,pitch:.
 const cam=Object.assign({y:1.6},STATIONS.outside);
 function inBuilding(x,z){return(Math.abs(x)<G.out.hw+.35&&z<G.out.front+.35&&z>G.arch.z1)||(Math.abs(x)<G.out.apHw+.35&&z<=G.arch.z1&&z>G.out.apBack-.35);}
 function allowed(x,z){
-  if(Math.abs(x)<=2.0&&z<=-.35&&z>=-10.7)return !(Math.abs(x)<1.6&&Math.abs(z+G.L/2)<1.6);   // nave, around the car's floor
+  if(Math.abs(x)<=2.0&&z<=-.35&&z>=-10.7)return !(Math.abs(x)<1.1&&Math.abs(z+G.L/2)<2.15);   // nave, around the car itself
   if(Math.abs(x)<=.7&&z<-10.7&&z>=-11.95)return true;             // under the arch
   if(Math.abs(x)<=1.05&&z<-11.95&&z>=G.altarZ+.55)return true;    // apse
   if(Math.abs(x)<=.45&&z>-.36&&z<=G.out.front+.4)return true;     // doorway
