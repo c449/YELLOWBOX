@@ -499,14 +499,19 @@ stage.addEventListener('pointermove',e=>{
 const endDrag=()=>{if(!drag)return;drag=null;stage.classList.remove('dragging');};
 stage.addEventListener('pointerup',endDrag);stage.addEventListener('pointercancel',endDrag);
 /* ---------- song ---------- */
-// Salve regina from 2:34; the video stays off screen, the button plays and pauses it
-let song=null,playing=false;
-$('#play').addEventListener('click',()=>{
-  playing=!playing;$('#play').setAttribute('aria-pressed',playing);$('#play').setAttribute('aria-label',playing?'Pause music':'Play music');
-  if(!song){song=document.createElement('iframe');song.title='Salve regina';song.allow='autoplay; encrypted-media';song.tabIndex=-1;
-    song.src='https://www.youtube-nocookie.com/embed/VmxdXzQeJ7c?start=154&autoplay=1&enablejsapi=1&rel=0&controls=0';$('#player').appendChild(song);return;}
-  song.contentWindow.postMessage(JSON.stringify({event:'command',func:playing?'playVideo':'pauseVideo',args:[]}),'*');
-});
+// Salve regina from 2:34. The player loads off screen with the page, so the first click can play it at once;
+// the icon follows the player's real state.
+const song=document.createElement('iframe');let playing=false,state=-1;
+song.title='Salve regina';song.allow='autoplay; encrypted-media';song.tabIndex=-1;
+song.src='https://www.youtube-nocookie.com/embed/VmxdXzQeJ7c?start=154&enablejsapi=1&playsinline=1&controls=0&rel=0&origin='+encodeURIComponent(location.origin);
+$('#player').appendChild(song);
+const yt=(func,args)=>song.contentWindow&&song.contentWindow.postMessage(JSON.stringify({event:'command',func,args:args||[]}),'*');
+const showSong=on=>{playing=on;$('#play').setAttribute('aria-pressed',on);$('#play').setAttribute('aria-label',on?'Pause music':'Play music');};
+// ask the player to report its state
+song.addEventListener('load',()=>{let n=0;const hi=setInterval(()=>{song.contentWindow.postMessage(JSON.stringify({event:'listening',id:1,channel:'widget'}),'*');if(++n>20)clearInterval(hi);},250);});
+addEventListener('message',e=>{if(!/youtube/.test(e.origin))return;let d;try{d=JSON.parse(e.data);}catch(_){return;}
+  const st=d.info&&d.info.playerState;if(typeof st==='number')state=st;if(st===1)showSong(true);else if(st===2||st===0)showSong(false);});
+$('#play').addEventListener('click',()=>{if(playing){yt('pauseVideo');showSong(false);}else{yt('unMute');yt('playVideo');showSong(true);setTimeout(()=>{if(state!==1&&state!==3)showSong(false);},2500);}});
 
 /* ---------- loop ---------- */
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?78:64;camera.updateProjectionMatrix();}
