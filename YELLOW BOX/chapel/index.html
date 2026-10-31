@@ -415,20 +415,19 @@ function build(){
     m.position.set(0,1.72,G.altarZ);cross={m,t,cols,rows,n:195,y:1.72};}
 
   /* the car from the video on its checkered floor, standing in the middle of the nave, front to the door.
-     The video is a full turntable (one turn in 540 frames); 144 of its views, one every 2.5 degrees, sit on one
-     sheet, and the car shows the view that matches where you stand, blending smoothly between neighbours.
+     The video is a full turntable (one turn in 540 frames); 144 of its views, one every 2.5 degrees, sit on two
+     sheets at near the video's own sharpness, and the car shows the one view that matches where you stand.
      Scale: the car is 4.27 m long; its floor reaches almost wall to wall and you can step onto it beside the car. */
-  {const cols=12,rows=12,n=144,ppm=708/4.27,w=848/ppm,h=371/ppm,ground=362;   // ground = the near edge of the checkered floor
-    const t=new THREE.TextureLoader().load('img/car-views.webp');t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;
-    // shown exactly as filmed: the sheet's colours go straight to the screen, two neighbouring views mixed
+  {const cols=6,rows=12,per=72,n=144,ppm=708/4.27,w=848/ppm,h=371/ppm,ground=362;   // ground = the near edge of the checkered floor
+    const sheet=k=>{const t=new THREE.TextureLoader().load('img/car-views-'+k+'.webp');t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;return t;};
+    // shown exactly as filmed: the sheet's colours go straight to the screen
     const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
-      uniforms:{map:{value:t},o0:{value:new THREE.Vector2()},o1:{value:new THREE.Vector2()},k:{value:0},rep:{value:new THREE.Vector2(1/cols,1/rows)}},
+      uniforms:{m0:{value:sheet(0)},m1:{value:sheet(1)},sel:{value:0},o:{value:new THREE.Vector2()},rep:{value:new THREE.Vector2(1/cols,1/rows)}},
       vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader:'uniform sampler2D map;uniform vec2 o0,o1,rep;uniform float k;varying vec2 vUv;'+
-        'void main(){vec2 u=vUv*rep*.996+rep*.002;vec4 a=texture2D(map,o0+u),b=texture2D(map,o1+u);'+
-        'float al=mix(a.a,b.a,k);if(al<.02)discard;vec3 c=(a.rgb*a.a*(1.-k)+b.rgb*b.a*k)/max(al,1e-4);gl_FragColor=vec4(c,al);}'});
+      fragmentShader:'uniform sampler2D m0,m1;uniform vec2 o,rep;uniform float sel;varying vec2 vUv;'+
+        'void main(){vec2 u=o+vUv*rep*.998+rep*.001;vec4 c=sel<.5?texture2D(m0,u):texture2D(m1,u);if(c.a<.02)discard;gl_FragColor=c;}'});
     const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
-    m.position.set(0,h/2-(371-ground)/ppm,-L/2);scene.add(m);car={m,mat,cols,rows,n};}
+    m.position.set(0,h/2-(371-ground)/ppm,-L/2);scene.add(m);car={m,mat,cols,rows,per,n};}
 
   /* slit windows and their light */
   const wmat=new THREE.MeshBasicMaterial({color:'#fffaf0',side:DS});
@@ -546,9 +545,8 @@ function frame(now){
   const bob=(f||s)?Math.sin(T*9)*.012:0;
   camera.position.set(cam.x,cam.y+bob,cam.z);camera.rotation.set(cam.pitch,cam.yaw,0);
   if(lantern)lantern.position.set(cam.x,cam.y+.3,cam.z);
-  if(car){const a=Math.atan2(cam.x-car.m.position.x,cam.z-car.m.position.z),f=((a/(2*PI)*car.n)%car.n+car.n)%car.n,i0=Math.floor(f)%car.n,i1=(i0+1)%car.n,
-      cell=(i,o)=>o.set((i%car.cols)/car.cols,1-(Math.floor(i/car.cols)+1)/car.rows);
-    cell(i0,car.mat.uniforms.o0.value);cell(i1,car.mat.uniforms.o1.value);car.mat.uniforms.k.value=f-Math.floor(f);car.m.rotation.y=a;}
+  if(car){const a=Math.atan2(cam.x-car.m.position.x,cam.z-car.m.position.z),i=((Math.round(a/(2*PI)*car.n)%car.n)+car.n)%car.n,j=i%car.per,u=car.mat.uniforms;
+    u.sel.value=i<car.per?0:1;u.o.value.set((j%car.cols)/car.cols,1-(Math.floor(j/car.cols)+1)/car.rows);car.m.rotation.y=a;}
   if(cross){const i=Math.floor(T*25)%cross.n;cross.t.offset.set((i%cross.cols)/cross.cols,1-(Math.floor(i/cross.cols)+1)/cross.rows);
     cross.m.position.y=cross.y+Math.sin(T*.7)*.06;cross.m.rotation.y=Math.atan2(cam.x-cross.m.position.x,cam.z-cross.m.position.z);}
   for(const c of candles){if(!c)continue;const fl=.82+.1*Math.sin(T*7.3+c.ph)+.06*Math.sin(T*13.1+c.ph*2)+.04*Math.sin(T*23+c.ph);c.pl.intensity=1.1*fl;c.sp.scale.set(.09*fl,.16*(.9+.2*fl),1);c.halo.material.opacity=.2*fl;}
