@@ -1,0 +1,281 @@
+<title>Crossing the Water</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* one full-screen view from the boat; no interface */
+:root{--bg:#000;color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);overflow:hidden;margin:0}
+#stage{position:fixed;inset:0;touch-action:none;cursor:grab}
+#stage.dragging{cursor:grabbing}
+#stage canvas{display:block;width:100%;height:100%}
+#lyrics{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+#tomb{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);height:50%;max-width:50%;object-fit:contain;pointer-events:none}
+</style>
+
+<div id="stage" aria-label="View from a small boat crossing the water toward the Isle of the Dead"></div>
+<canvas id="lyrics" aria-hidden="true"></canvas>
+<img id="tomb" src="tomb.webp" alt="">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const PI=Math.PI;
+
+/* ---------- palette after Böcklin and the Six of Swords ---------- */
+const COL={
+  skyTop:new THREE.Color('#1b2028'),
+  skyHor:new THREE.Color('#7d838a'),
+  fog:new THREE.Color('#5c636a'),
+  waterDeep:new THREE.Color('#0d1416'),
+  waterShallow:new THREE.Color('#1f2a2b'),
+  rock:new THREE.Color('#b3a48c'),
+  rockDark:new THREE.Color('#5e5446'),
+  cypress:new THREE.Color('#141c14'),
+  wood:new THREE.Color('#4a3a2a'),
+  woodLight:new THREE.Color('#6b5640')
+};
+
+const ISL=640;            // island distance from the start, metres
+const STOP=ISL-170;        // where the boat comes to rest
+const DURATION=234.26;   // the crossing lasts the song (Bellies, Nina Nastasia)
+
+let seed=7;function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}
+
+// 3D value noise
+const P=new Uint8Array(512);{const p=[];for(let i=0;i<256;i++)p[i]=i;for(let i=255;i>0;i--){const j=Math.floor(rnd()*(i+1));[p[i],p[j]]=[p[j],p[i]];}for(let i=0;i<512;i++)P[i]=p[i&255];}
+const fade=t=>t*t*(3-2*t);
+function h3(x,y,z){return P[(P[(P[x&255]+y)&255]+z)&255]/255;}
+function vnoise(x,y,z){const X=Math.floor(x),Y=Math.floor(y),Z=Math.floor(z),fx=fade(x-X),fy=fade(y-Y),fz=fade(z-Z);
+  const l=(a,b,t)=>a+(b-a)*t;
+  return l(l(l(h3(X,Y,Z),h3(X+1,Y,Z),fx),l(h3(X,Y+1,Z),h3(X+1,Y+1,Z),fx),fy),l(l(h3(X,Y,Z+1),h3(X+1,Y,Z+1),fx),l(h3(X,Y+1,Z+1),h3(X+1,Y+1,Z+1),fx),fy),fz);}
+function fbm(x,y,z,o){let a=0,s=1,f=1,n=0;for(let i=0;i<(o||4);i++){a+=vnoise(x*f,y*f,z*f)*s;n+=s;s*=.5;f*=2.03;}return a/n;}
+
+/* ---------- renderer ---------- */
+const stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+stage.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(COL.fog,.0011);
+const camera=new THREE.PerspectiveCamera(55,1,.05,4000);
+
+/* ---------- light: low and from the left, as in the painting ---------- */
+scene.add(new THREE.HemisphereLight(0x8a9096,0x1a1c1c,.75));
+const sun=new THREE.DirectionalLight(0xf0e6d2,1.15);
+sun.position.set(-300,180,120);scene.add(sun);
+
+/* ---------- sky ---------- */
+const sky=new THREE.Mesh(new THREE.SphereGeometry(3000,32,16),new THREE.ShaderMaterial({
+  side:THREE.BackSide,depthWrite:false,fog:false,
+  uniforms:{top:{value:COL.skyTop},hor:{value:COL.skyHor}},
+  vertexShader:'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:`uniform vec3 top,hor;varying vec3 vP;
+    float hh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+    float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hh(i),hh(i+vec2(1,0)),f.x),mix(hh(i+vec2(0,1)),hh(i+vec2(1,1)),f.x),f.y);}
+    void main(){vec3 d=normalize(vP);float y=max(d.y,0.);
+      vec3 c=mix(hor,top,pow(y,.45));
+      vec2 q=d.xz/(d.y+.12)*2.;float cl=n2(q)*.5+n2(q*2.1)*.3+n2(q*4.3)*.2;
+      c=mix(c,c*.72,smoothstep(.45,.8,cl)*smoothstep(0.,.3,y));
+      c=mix(c,hor,smoothstep(.06,0.,y));
+      gl_FragColor=vec4(c,1.);}`
+}));
+sky.renderOrder=-2;scene.add(sky);
+
+/* ---------- water: rough where the boat leaves, calm toward the island ---------- */
+const water=new THREE.Mesh(new THREE.PlaneGeometry(2400,2400,320,320),new THREE.ShaderMaterial({
+  fog:false,
+  uniforms:{t:{value:0},cam:{value:new THREE.Vector3()},deep:{value:COL.waterDeep},shal:{value:COL.waterShallow},
+    top:{value:COL.skyTop},hor:{value:COL.skyHor},fogC:{value:COL.fog},fogD:{value:.0011},calmZ:{value:-ISL},
+    sunDir:{value:new THREE.Vector3(-300,180,120).normalize()}},
+  vertexShader:`uniform float t,calmZ;varying vec3 vW;
+    float rough(float z){return mix(1.,.12,smoothstep(0.,calmZ+60.,z));}
+    float swell(vec2 p){return sin(p.x*.11+t*.9)*.35+sin(p.y*.15-t*1.1+p.x*.05)*.45+sin((p.x+p.y)*.23+t*1.4)*.18;}
+    void main(){vec4 w=modelMatrix*vec4(position,1.);w.y+=swell(w.xz)*rough(w.z);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
+  fragmentShader:`uniform float t,calmZ,fogD;uniform vec3 cam,deep,shal,top,hor,fogC,sunDir;varying vec3 vW;
+    float rough(float z){return mix(1.,.12,smoothstep(0.,calmZ+60.,z));}
+    float hh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+    float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hh(i),hh(i+vec2(1,0)),f.x),mix(hh(i+vec2(0,1)),hh(i+vec2(1,1)),f.x),f.y);}
+    float H(vec2 p){float r=rough(p.y);
+      float a=sin(p.x*.11+t*.9)*.35+sin(p.y*.15-t*1.1+p.x*.05)*.45+sin((p.x+p.y)*.23+t*1.4)*.18;
+      a+=(sin(p.x*.9+p.y*.4+t*2.3)*.07+sin(p.y*1.3-p.x*.7-t*2.9)*.05)*r;
+      a+=(n2(p*1.7+vec2(t*.6,-t*.4))*.08+n2(p*4.1-vec2(t,t*.7))*.04)*r;
+      return a*r+n2(p*6.+t*.3)*.006;}
+    void main(){vec2 p=vW.xz;float e=.12;
+      vec3 n=normalize(vec3(H(p-vec2(e,0))-H(p+vec2(e,0)),2.*e,H(p-vec2(0,e))-H(p+vec2(0,e))));
+      vec3 v=normalize(cam-vW);float fr=.02+.98*pow(1.-max(dot(n,v),0.),5.);
+      vec3 r=reflect(-v,n);float ry=max(r.y,0.);vec3 sk=mix(hor,top,pow(ry,.45));
+      vec3 c=mix(mix(deep,shal,max(n.y-.9,0.)*6.),sk,fr*.85);
+      c+=vec3(.9,.86,.78)*pow(max(dot(r,sunDir),0.),180.)*.35;
+      float d=length(cam-vW);c=mix(fogC,c,exp(-pow(d*fogD,2.)));
+      gl_FragColor=vec4(c,1.);}`
+}));
+water.rotation.x=-PI/2;water.renderOrder=2;scene.add(water);
+function roughAt(z){const a=0,b=-ISL+60;let k=(z-a)/(b-a);k=Math.min(Math.max(k,0),1);k=k*k*(3-2*k);return 1+(.12-1)*k;}
+function swell(x,z,t){return Math.sin(x*.11+t*.9)*.35+Math.sin(z*.15-t*1.1+x*.05)*.45+Math.sin((x+z)*.23+t*1.4)*.18;}
+
+/* ---------- the Isle of the Dead: Böcklin's painting (third version, 1883), cut out and stood on the water ---------- */
+// island outline traced on the painting, in units of a 2000 px wide copy
+const OUTLINE=[[205,890],[212,700],[220,520],[232,330],[245,255],[275,215],[330,180],[360,150],[385,135],[430,135],[460,118],[500,98],[560,74],[592,80],[615,140],[650,200],[690,250],[722,288],
+[735,240],[748,226],[760,250],[770,300],[790,290],[805,258],[818,254],[832,280],[842,250],[860,200],[880,158],[900,138],[912,118],[922,172],[932,188],[942,180],[952,258],[965,318],[977,330],[987,308],[997,318],[1007,328],[1018,302],[1032,298],[1046,268],[1056,243],[1068,238],[1080,208],[1092,168],[1106,118],[1119,78],[1131,58],[1142,64],[1152,98],[1162,148],[1177,168],[1191,198],[1201,236],[1211,212],[1222,228],[1242,228],[1257,248],[1276,212],[1291,188],[1299,166],[1306,194],[1312,238],[1332,243],[1356,238],[1382,218],[1422,198],[1462,168],[1502,143],[1546,123],[1600,113],[1647,113],[1662,150],[1672,240],[1674,330],[1668,420],[1668,478],
+[1682,438],[1702,388],[1726,358],[1746,368],[1772,428],[1802,518],[1822,618],[1837,718],[1844,800],[1848,880],[1848,1010],[205,1010]];
+const WATERLINE=885;                 // painting row where the rocks meet the water
+const isle=new THREE.Group();isle.position.set(0,0,-ISL);scene.add(isle);
+{const im=new Image();im.onload=()=>{
+  const W=im.naturalWidth,H=im.naturalHeight,k=W/2000;
+  const x0=190*k,y0=40*k,x1=1865*k,y1=1015*k,cw=Math.round(x1-x0),ch=Math.round(y1-y0);
+  const c=document.createElement('canvas');c.width=cw;c.height=ch;const g=c.getContext('2d');
+  g.drawImage(im,-x0,-y0);
+  // soft-edged mask of the outline
+  const m=document.createElement('canvas');m.width=cw;m.height=ch;const mg=m.getContext('2d');
+  mg.filter='blur('+(3*k)+'px)';mg.beginPath();OUTLINE.forEach(([x,y],i)=>{const px=x*k-x0,py=y*k-y0;i?mg.lineTo(px,py):mg.moveTo(px,py);});mg.closePath();mg.fillStyle='#fff';mg.fill();
+  mg.globalCompositeOperation='destination-out';mg.lineWidth=9*k;mg.lineJoin='round';mg.stroke();   // pull the edge in off the painted sky
+  // the painted water melts into the sea below the rocks
+  mg.filter='none';mg.globalCompositeOperation='destination-out';
+  const wl=WATERLINE*k-y0,gr=mg.createLinearGradient(0,wl,0,ch);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(0,0,0,1)');mg.fillStyle=gr;mg.fillRect(0,wl,cw,ch-wl);
+  g.globalCompositeOperation='destination-in';g.drawImage(m,0,0);
+  const tex=new THREE.CanvasTexture(c);tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  const wide=125,px=wide/cw;                         // metres across the painted island
+  const plane=new THREE.Mesh(new THREE.PlaneGeometry(wide,ch*px),new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,fog:true}));
+  plane.position.y=(wl-ch/2)*px;plane.renderOrder=3;isle.add(plane);
+};im.src='island.jpg';}
+
+/* ---------- the boat: small, humble, seen from the seat ---------- */
+const boat=new THREE.Group();scene.add(boat);
+const BL=4.2,BW=.62,STERN=1.5;   // length, half-beam, stern z
+function hullGeo(){
+  const N=40,M=16,pos=[],col=[],idx=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N,z=STERN-t*BL;
+    const w=BW*Math.pow(Math.sin(PI*t),.7);           // gussi: pointed at both ends
+    const top=.62+Math.pow(t,3)*.28+Math.pow(1-t,3)*.2;   // sheer rises at both ends
+    const d=.55*(1-.25*t);
+    for(let k=0;k<=M;k++){
+      const a=-PI/2+k/M*PI,x=Math.sin(a)*w,y=top-Math.cos(a)*d;
+      pos.push(x,y,z);
+      const plank=Math.floor(k/2)%2?1:.86,c=COL.wood.clone().multiplyScalar(plank*(.92+fbm(i*.3,k,0,2)*.16));
+      col.push(c.r,c.g,c.b);
+    }
+  }
+  for(let i=0;i<N;i++)for(let k=0;k<M;k++){const a=i*(M+1)+k,b=a+M+1;idx.push(a,b,a+1,b,b+1,a+1);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();
+  return{g,N,M,pos};
+}
+const H0=hullGeo();
+const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:1,flatShading:true});
+const hull=new THREE.Mesh(H0.g,woodMat);boat.add(hull);
+// gunwales
+const gunMat=new THREE.MeshStandardMaterial({color:COL.woodLight,roughness:.95});
+[0,H0.M].forEach(k=>{const pts=[];for(let i=0;i<=H0.N;i++){const j=(i*(H0.M+1)+k)*3;pts.push(new THREE.Vector3(H0.pos[j],H0.pos[j+1]+.02,H0.pos[j+2]));}
+  boat.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),60,.035,6),gunMat));});
+// stem posts (roda) at bow and stern, the bow one rising above the gunwale
+const postMat=new THREE.MeshStandardMaterial({color:COL.woodLight,roughness:.95});
+[[STERN-BL,-1,1.18],[STERN,1,.98]].forEach(([z,d,h])=>{
+  const c=new THREE.CatmullRomCurve3([new THREE.Vector3(0,.12,z-d*.25),new THREE.Vector3(0,.5,z+d*.03),new THREE.Vector3(0,.9,z+d*.04),new THREE.Vector3(0,h,z-d*.04)]);
+  boat.add(new THREE.Mesh(new THREE.TubeGeometry(c,24,.045,6),postMat));});
+// floorboards and a thwart
+const boardMat=new THREE.MeshStandardMaterial({color:0x3b2e22,roughness:1});
+for(let i=-2;i<=2;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(.12,.02,2.2),boardMat);b.position.set(i*.12,.2,-.3);boat.add(b);}
+const thw=new THREE.Mesh(new THREE.BoxGeometry(1.2,.05,.24),gunMat);thw.position.set(0,.5,-1.15);thw.scale.x=.98;boat.add(thw);
+
+// keep the sea out of the hull: an invisible lid at the gunwale drawn after the boat, before the water
+{const s=new THREE.Shape();for(let i=0;i<=H0.N;i++){const j=(i*(H0.M+1))*3;const p=[H0.pos[j],H0.pos[j+2]];i?s.lineTo(p[0],-p[1]):s.moveTo(p[0],-p[1]);}
+  for(let i=H0.N;i>=0;i--){const j=(i*(H0.M+1)+H0.M)*3;s.lineTo(H0.pos[j],-H0.pos[j+2]);}
+  const lid=new THREE.Mesh(new THREE.ShapeGeometry(s),new THREE.MeshBasicMaterial({colorWrite:false,side:THREE.DoubleSide}));
+  lid.rotation.x=-PI/2;lid.position.y=.6;lid.renderOrder=1;boat.add(lid);}
+
+// the viewer sits near the stern, facing the bow
+const head=new THREE.Group();head.position.set(0,1.0,.85);boat.add(head);head.add(camera);
+// boat and island hidden: only the water, the sky and the rocking remain
+boat.children.forEach(c=>{if(c!==head)c.visible=false;});isle.visible=false;
+
+/* ---------- look around by dragging (no controls on screen) ---------- */
+let yaw=0,pitch=.14,tYaw=0,tPitch=.14,drag=null;
+stage.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw:tYaw,pitch:tPitch};stage.classList.add('dragging');stage.setPointerCapture(e.pointerId);});
+stage.addEventListener('pointermove',e=>{if(!drag)return;const k=PI/innerHeight;tYaw=drag.yaw+(e.clientX-drag.x)*k;tPitch=Math.max(-.9,Math.min(.6,drag.pitch+(e.clientY-drag.y)*k));});
+const end=()=>{drag=null;stage.classList.remove('dragging');};
+stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',end);
+
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?56:40;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();
+
+
+/* ---------- lyrics: Cecilia's calligraphy sheet, one line at a time ---------- */
+// approximate vertical centre of each written line on the sheet (original pixels)
+const LINE_Y=[128,230,363,470,670,782,883,1019,1240,1390,1524,1659,1824,1950,2090,2194,2297,2415];
+const LY=document.getElementById('lyrics'),lx=LY.getContext('2d');
+let LINES=null,INK=null;
+// each stroke of ink is traced as a whole and given to the written line it sits on, so loops and tails stay with their letters
+{const im=new Image();im.onload=()=>{
+  const W=im.naturalWidth,H=im.naturalHeight,c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');x.drawImage(im,0,0);const d=x.getImageData(0,0,W,H).data;
+  const ink=new Uint8Array(W*H);for(let i=0;i<W*H;i++){const v=255-(d[i*4]*.3+d[i*4+1]*.59+d[i*4+2]*.11);ink[i]=v>255?255:v<0?0:v;}
+  const lab=new Int32Array(W*H),stack=new Int32Array(W*H);const comps=[null];
+  for(let p0=0;p0<W*H;p0++){if(lab[p0]||ink[p0]<28)continue;
+    const id=comps.length;let sp=0,n=0,sy=0,x0=W,x1=0,y0=H,y1=0;stack[sp++]=p0;lab[p0]=id;
+    while(sp){const p=stack[--sp],px=p%W,py=(p-px)/W;n++;sy+=py;if(px<x0)x0=px;if(px>x1)x1=px;if(py<y0)y0=py;if(py>y1)y1=py;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const qx=px+dx,qy=py+dy;if(qx<0||qy<0||qx>=W||qy>=H)continue;const q=qy*W+qx;if(!lab[q]&&ink[q]>=28){lab[q]=id;stack[sp++]=q;}}}
+    let line=-1;if(n>=8){const my=sy/n;let best=1e9;LINE_Y.forEach((ly,i)=>{const dd=Math.abs(ly-my);if(dd<best){best=dd;line=i;}});}
+    comps.push({line,x0,x1,y0,y1});}
+  const box=LINE_Y.map(()=>({x0:W,x1:0,y0:H,y1:0}));
+  comps.forEach(k=>{if(!k||k.line<0)return;const b=box[k.line];b.x0=Math.min(b.x0,k.x0);b.x1=Math.max(b.x1,k.x1);b.y0=Math.min(b.y0,k.y0);b.y1=Math.max(b.y1,k.y1);});
+  LINES=box.map((b,i)=>{const pad=3,bx=Math.max(0,b.x0-pad),by=Math.max(0,b.y0-pad),bw=Math.min(W,b.x1+pad+1)-bx,bh=Math.min(H,b.y1+pad+1)-by;
+    const o=document.createElement('canvas');o.width=bw;o.height=bh;const ox=o.getContext('2d'),od=ox.createImageData(bw,bh);
+    for(let y=0;y<bh;y++)for(let xx=0;xx<bw;xx++){const sp=(by+y)*W+bx+xx;let own=lab[sp]&&comps[lab[sp]].line===i;
+      if(!lab[sp]&&ink[sp]>8){for(let dy=-1;dy<=1&&!own;dy++)for(let dx=-1;dx<=1;dx++){const q=sp+dy*W+dx;if(q>=0&&q<W*H&&lab[q]&&comps[lab[q]].line===i){own=true;break;}}}
+      if(own){const di=(y*bw+xx)*4;od.data[di+3]=Math.min(255,ink[sp]*1.25);}}
+    ox.putImageData(od,0,0);return{c:o,w:bw,h:bh};});
+  INK={w:Math.max(...box.map(b=>b.x1-b.x0))};
+};im.src='lyrics.jpg';}
+// [sheet line, start, end] in seconds of the song, from where each line is sung
+const CUES=[[0,11.1,15.2],[1,15.4,20.5],[2,20.7,24.9],[3,25.1,30.3],[4,32.3,35.9],[5,36.1,41.6],[6,42.3,46.1],[7,46.2,51.8],
+  [8,52.6,55.5],[9,55.7,58.9],[10,59.1,61.1],[11,61.2,64.2],[12,64.4,68.1],[13,68.3,73.0],
+  [14,99.3,103.7],[15,103.9,110.2],[16,110.4,113.2],[17,113.4,118.2],
+  [8,143.6,146.5],[9,146.7,149.5],[10,149.7,152.1],[11,152.3,155.1],[12,155.3,158.3],[13,158.5,164.6]];
+const L_FADE=.5;
+function drawLyrics(t){
+  const w=LY.clientWidth,h=LY.clientHeight,dpr=Math.min(devicePixelRatio,2);
+  if(LY.width!==Math.round(w*dpr)){LY.width=Math.round(w*dpr);LY.height=Math.round(h*dpr);}
+  lx.setTransform(1,0,0,1,0,0);lx.clearRect(0,0,LY.width,LY.height);
+  if(!LINES)return;
+  const q=CUES.find(c=>t>=c[1]&&t<c[2]);if(!q)return;
+  const i=q[0],a=Math.min(1,(t-q[1])/L_FADE,(q[2]-t)/L_FADE);if(a<=0)return;
+  const L=LINES[i],g=Math.max(16,w*.04),sc=Math.min(3*(w-2*g)/INK.w,(w-2*g)/L.w,h*.45/L.h);   // three times the earlier size, never wider than the screen
+  lx.setTransform(dpr,0,0,dpr,0,0);lx.globalAlpha=a;
+  lx.drawImage(L.c,(w-L.w*sc)/2,h*.5-L.h*sc/2,L.w*sc,L.h*sc);   // centred over the tomb image
+}
+
+/* ---------- the crossing ---------- */
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const t0=performance.now();
+// the song starts on the first click, tap or key; the crossing follows the song's clock
+const song=new Audio('song.mp3');song.preload='auto';
+const TEST=+new URLSearchParams(location.search).get('t')||0;
+let started=false;
+const clock=()=>started?song.currentTime:(performance.now()-t0)/1000+TEST;
+// if the browser blocks sound, the crossing runs silent; the first click starts it again from the top with the song
+function start(){if(started)return;started=true;if(TEST)song.currentTime=TEST;song.play().catch(()=>{started=false;});}
+start();   // plays at once where the browser allows it; otherwise on the first click, tap or key
+addEventListener('pointerdown',start);addEventListener('keydown',start);
+function frame(now){
+  const t=(now-t0)/1000,st=clock();
+  let k=Math.min(st/DURATION,1);k=k*(2-k)*.35+k*.65;   // eases into the landing
+  const z=-STOP*k,r=roughAt(z),m=reduce?.3:1;
+  const yv=swell(0,z,t)*r;
+  boat.position.set(0,yv-.18,z);
+  const dz=(swell(0,z-1.5,t)-swell(0,z+1.5,t))*r,dx=(swell(.7,z,t)-swell(-.7,z,t))*r;
+  boat.rotation.x=Math.atan2(dz,3)*.9*m;
+  boat.rotation.z=(Math.atan2(dx,1.4)*.7+Math.sin(t*.7)*.03*r)*m;
+  yaw+=(tYaw-yaw)*.08;pitch+=(tPitch-pitch)*.08;
+  head.rotation.set(pitch+Math.sin(t*.31)*.01,yaw+Math.sin(t*.17)*.015,0,'YXZ');
+  water.position.set(0,0,Math.round(z/7.5)*7.5);
+  water.material.uniforms.t.value=t;
+  camera.getWorldPosition(water.material.uniforms.cam.value);
+  sky.position.copy(water.material.uniforms.cam.value);
+  renderer.render(scene,camera);
+  drawLyrics(st);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
