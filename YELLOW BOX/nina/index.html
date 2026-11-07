@@ -244,7 +244,7 @@ function drawLyrics(t){
   const i=q[0],a=Math.min(1,(t-q[1])/L_FADE,(q[2]-t)/L_FADE);if(a<=0)return;
   const L=LINES[i],g=Math.max(16,w*.04),sc=Math.min(3*(w-2*g)/INK.w,(w-2*g)/L.w,h*.45/L.h);   // three times the earlier size, never wider than the screen
   lx.setTransform(dpr,0,0,dpr,0,0);lx.globalAlpha=a;
-  lx.drawImage(L.c,(w-L.w*sc)/2,h*.5-L.h*sc/2,L.w*sc,L.h*sc);   // centred over the tomb image
+  lx.drawImage(L.c,(w-L.w*sc)/2,h*.5-L.h*sc/2,L.w*sc,L.h*sc);   // centred on screen
 }
 
 /* ---------- the crossing ---------- */
