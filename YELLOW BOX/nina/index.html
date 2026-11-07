@@ -18,6 +18,7 @@ body{background:var(--bg);overflow:hidden;margin:0}
 <canvas id="lyrics" aria-hidden="true"></canvas>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (function(){
 'use strict';
@@ -189,15 +190,24 @@ const thw=new THREE.Mesh(new THREE.BoxGeometry(1.2,.05,.24),gunMat);thw.position
 const head=new THREE.Group();head.position.set(0,1.0,.85);boat.add(head);head.add(camera);
 // boat and island hidden: only the water, the sky and the rocking remain
 boat.children.forEach(c=>{if(c!==head)c.visible=false;});
+// the llaut made in Blender (7 m, lateen sail); its waterline sits where the sea meets the boat
+{const LW=7,LB=2.5,WLY=.73;
+ new THREE.GLTFLoader().load('llaut.glb',g=>{const m=g.scene;m.rotation.y=PI/2;m.position.y=WLY;boat.add(m);});
+ // keep the sea out of the hull: an invisible lid over the deck outline
+ const s=new THREE.Shape();for(let i=0;i<=40;i++){const t=-1+i/20,hb=Math.max(LB/2*(1-Math.pow(Math.abs(t),2.3)),.035);i?s.lineTo(hb,t*LW/2):s.moveTo(hb,t*LW/2);}
+ for(let i=40;i>=0;i--){const t=-1+i/20,hb=Math.max(LB/2*(1-Math.pow(Math.abs(t),2.3)),.035);s.lineTo(-hb,t*LW/2);}
+ const lid=new THREE.Mesh(new THREE.ShapeGeometry(s),new THREE.MeshBasicMaterial({colorWrite:false,side:THREE.DoubleSide}));
+ lid.rotation.x=-PI/2;lid.position.y=WLY-.02;lid.renderOrder=1;boat.add(lid);
+ head.position.set(.4,WLY+.95,3.0);}   // seated on the stern deck, facing the bow
 
 /* ---------- look around by dragging (no controls on screen) ---------- */
-let yaw=0,pitch=.14,tYaw=0,tPitch=.14,drag=null;
+let yaw=0,pitch=-.04,tYaw=0,tPitch=-.04,drag=null;
 stage.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw:tYaw,pitch:tPitch};stage.classList.add('dragging');stage.setPointerCapture(e.pointerId);});
 stage.addEventListener('pointermove',e=>{if(!drag)return;const k=PI/innerHeight;tYaw=drag.yaw+(e.clientX-drag.x)*k;tPitch=Math.max(-.9,Math.min(.6,drag.pitch+(e.clientY-drag.y)*k));});
 const end=()=>{drag=null;stage.classList.remove('dragging');};
 stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',end);
 
-function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?56:40;camera.updateProjectionMatrix();}
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?72:55;camera.updateProjectionMatrix();}
 addEventListener('resize',resize);resize();
 
 
