@@ -198,10 +198,10 @@ boat.children.forEach(c=>{if(c!==head)c.visible=false;});
  for(let i=40;i>=0;i--){const t=-1+i/20,hb=Math.max(LB/2*(1-Math.pow(Math.abs(t),2.3)),.035);s.lineTo(-hb,t*LW/2);}
  const lid=new THREE.Mesh(new THREE.ShapeGeometry(s),new THREE.MeshBasicMaterial({colorWrite:false,side:THREE.DoubleSide}));
  lid.rotation.x=-PI/2;lid.position.y=WLY-.02;lid.renderOrder=1;boat.add(lid);
- head.position.set(.15,WLY+1.05,-2.5);}   // seated near the bow, facing forward
+ head.position.set(.55,WLY+1.05,-2.5);}   // seated near the bow
 
 /* ---------- look around by dragging (no controls on screen) ---------- */
-let yaw=0,pitch=.2,tYaw=0,tPitch=.2,drag=null;
+let yaw=PI,pitch=-.1,tYaw=PI,tPitch=-.1,drag=null;   // from the bow, facing the captain at the stern
 stage.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw:tYaw,pitch:tPitch};stage.classList.add('dragging');stage.setPointerCapture(e.pointerId);});
 stage.addEventListener('pointermove',e=>{if(!drag)return;const k=PI/innerHeight;tYaw=drag.yaw+(e.clientX-drag.x)*k;tPitch=Math.max(-.9,Math.min(.6,drag.pitch+(e.clientY-drag.y)*k));});
 const end=()=>{drag=null;stage.classList.remove('dragging');};
