@@ -198,7 +198,7 @@ boat.children.forEach(c=>{if(c!==head)c.visible=false;});
  for(let i=40;i>=0;i--){const t=-1+i/20,hb=Math.max(LB/2*(1-Math.pow(Math.abs(t),2.3)),.035);s.lineTo(-hb,t*LW/2);}
  const lid=new THREE.Mesh(new THREE.ShapeGeometry(s),new THREE.MeshBasicMaterial({colorWrite:false,side:THREE.DoubleSide}));
  lid.rotation.x=-PI/2;lid.position.y=WLY-.02;lid.renderOrder=1;boat.add(lid);
- head.position.set(.4,WLY+.95,3.0);}   // seated on the stern deck, facing the bow
+ head.position.set(.15,WLY+1.05,-2.5);}   // seated near the bow, facing forward
 
 /* ---------- look around by dragging (no controls on screen) ---------- */
 let yaw=0,pitch=.2,tYaw=0,tPitch=.2,drag=null;
