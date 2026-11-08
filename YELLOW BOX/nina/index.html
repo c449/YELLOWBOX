@@ -190,9 +190,9 @@ const thw=new THREE.Mesh(new THREE.BoxGeometry(1.2,.05,.24),gunMat);thw.position
 const head=new THREE.Group();head.position.set(0,1.0,.85);boat.add(head);head.add(camera);
 // boat and island hidden: only the water, the sky and the rocking remain
 boat.children.forEach(c=>{if(c!==head)c.visible=false;});
-// the cracked llaut made in Blender (7 m, lateen sail, cracks baked into image textures); its waterline sits where the sea meets the boat
+// the basic llaut from Blender wrapped in paintings (7 m, lateen sail, paintings baked into image textures); its waterline sits where the sea meets the boat
 {const LW=7,LB=2.5,WLY=.73;
- new THREE.GLTFLoader().load('llaut-cracked.glb',g=>{const m=g.scene;m.rotation.y=PI/2;m.position.y=WLY;boat.add(m);});
+ new THREE.GLTFLoader().load('llaut-painting.glb',g=>{const m=g.scene;m.rotation.y=PI/2;m.position.y=WLY;boat.add(m);});
  // keep the sea out of the hull: an invisible lid over the deck outline
  const s=new THREE.Shape();for(let i=0;i<=40;i++){const t=-1+i/20,hb=Math.max(LB/2*(1-Math.pow(Math.abs(t),2.3)),.035);i?s.lineTo(hb,t*LW/2):s.moveTo(hb,t*LW/2);}
  for(let i=40;i>=0;i--){const t=-1+i/20,hb=Math.max(LB/2*(1-Math.pow(Math.abs(t),2.3)),.035);s.lineTo(-hb,t*LW/2);}
