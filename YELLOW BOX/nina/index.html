@@ -193,7 +193,10 @@ boat.children.forEach(c=>{if(c!==head)c.visible=false;});
 // the painted llaut from Blender with the barmaid as captain at the tiller (paintings baked into image textures); its waterline sits where the sea meets the boat
 {const LW=7,LB=2.5,WLY=.73;
  new THREE.GLTFLoader().load('llaut-captain.glb',g=>{const m=g.scene;m.rotation.y=PI/2;m.position.y=WLY;
-   m.traverse(o=>{if(o.isMesh){[].concat(o.material).forEach(t=>{t.roughness=1;t.metalness=0;t.envMapIntensity=0;});}});   // matte: no shine on the wood and paint
+   // a literal wrap: each painting shown with its own colours, no lighting, no shine
+   m.traverse(o=>{if(!o.isMesh)return;const mk=t=>{if(t.map){t.map.encoding=THREE.LinearEncoding;t.map.needsUpdate=true;}
+     return new THREE.MeshBasicMaterial({map:t.map||null,color:t.map?0xffffff:t.color,side:THREE.DoubleSide});};
+     o.material=Array.isArray(o.material)?o.material.map(mk):mk(o.material);});
    boat.add(m);});
  // keep the sea out of the hull: an invisible lid over the deck outline
  const s=new THREE.Shape();for(let i=0;i<=40;i++){const t=-1+i/20,hb=Math.max(LB/2*(1-Math.pow(Math.abs(t),2.3)),.035);i?s.lineTo(hb,t*LW/2):s.moveTo(hb,t*LW/2);}
