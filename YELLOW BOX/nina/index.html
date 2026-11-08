@@ -206,7 +206,7 @@ boat.children.forEach(c=>{if(c!==head)c.visible=false;});
  head.position.set(.55,WLY+1.05,-2.5);}   // seated near the bow
 
 /* ---------- look around by dragging (no controls on screen) ---------- */
-let yaw=PI,pitch=-.1,tYaw=PI,tPitch=-.1,drag=null;   // from the bow, facing the captain at the stern
+let yaw=0,pitch=-.1,tYaw=0,tPitch=-.1,drag=null;   // opens facing the front of the boat
 stage.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw:tYaw,pitch:tPitch};stage.classList.add('dragging');stage.setPointerCapture(e.pointerId);});
 stage.addEventListener('pointermove',e=>{if(!drag)return;const k=PI/innerHeight;tYaw=drag.yaw+(e.clientX-drag.x)*k;tPitch=Math.max(-.9,Math.min(.6,drag.pitch+(e.clientY-drag.y)*k));});
 const end=()=>{drag=null;stage.classList.remove('dragging');};
