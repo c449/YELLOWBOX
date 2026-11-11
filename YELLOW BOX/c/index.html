@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COOTIE CATCHER</title>
+<style>
+  :root { --fg: #fff; --bg: #000; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--fg); overflow: hidden; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; text-transform: uppercase; font-size: 14px; letter-spacing: .02em; -webkit-user-select: none; user-select: none; }
+  #ui { position: fixed; top: 16px; left: 16px; z-index: 10; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  #ui button { font: inherit; color: var(--fg); background: none; border: 0; cursor: pointer; padding: 0; text-transform: uppercase; letter-spacing: inherit; }
+  #ui button[hidden], #status:empty, #count[hidden] { display: none; }
+  #count { display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 420px; }
+  #count button { font: inherit; color: var(--fg); background: none; border: 0; padding: 2px 0; cursor: pointer; letter-spacing: inherit; }
+  #stage { position: fixed; inset: 0; perspective: 1800px; perspective-origin: 50% 40%; }
+  #board { position: absolute; left: 50%; top: 50%; transform-style: preserve-3d; }
+  .p { position: absolute; left: 0; top: 0; transform-origin: 0 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background-repeat: no-repeat; background-size: 100% 100%; }
+  .tri { background-image: url(inside.jpg?v=4); }
+  .tip, .under { background-image: url(front.jpg); }
+  .back, .bk { background-image: url(back.jpg); }
+  .bk { background-size: 200% 200%; background-position: 50% 50%; }
+  .p { pointer-events: none; }
+  .pk { background-image: url(pockets.jpg?v=3); background-size: 200% 100%; backface-visibility: visible; -webkit-backface-visibility: visible; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="status"></div>
+  <div id="count"></div>
+</div>
+<div id="stage"><div id="board"></div></div>
+<script>
+(() => {
+  const board = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+
+  // Board coordinates are fractions of the closed square (0..1).
+  const TL=[0,0], TR=[1,0], BR=[1,1], BL=[0,1], T=[.5,0], R=[1,.5], B=[.5,1], L=[0,.5], C=[.5,.5];
+  // n: number on the flap, q: pocket, pts: [hingeA, hingeB, apex]
+  const DEFS = [
+    { n:1, q:'bl', pts:[L,BL,C] },
+    { n:2, q:'tl', pts:[TL,L,C] },
+    { n:3, q:'tl', pts:[TL,T,C] },
+    { n:4, q:'tr', pts:[T,TR,C] },
+    { n:5, q:'tr', pts:[TR,R,C] },
+    { n:6, q:'br', pts:[R,BR,C] },
+    { n:7, q:'br', pts:[B,BR,C] },
+    { n:8, q:'bl', pts:[BL,B,C] },
+  ];
+  const SET_V = [3,4,7,8], SET_H = [1,2,5,6], ALL = [1,2,3,4,5,6,7,8];
+
+  let S = 400; // board size in px
+
+  function grow(pts, k) { // push polygon out a hair from its centroid to hide seams
+    const cx = pts.reduce((a,p)=>a+p[0],0)/pts.length, cy = pts.reduce((a,p)=>a+p[1],0)/pts.length;
+    return pts.map(p => [cx + (p[0]-cx)*(1+k), cy + (p[1]-cy)*(1+k)]);
+  }
+  const poly = pts => 'polygon(' + pts.map(p => (p[0]*100).toFixed(3)+'% '+(p[1]*100).toFixed(3)+'%').join(',') + ')';
+  const toBig = p => [(p[0]+.5)/2, (p[1]+.5)/2]; // board fraction -> fraction of the 2x unfolded sheet
+
+  function mk(cls, clip) {
+    const d = document.createElement('div');
+    d.className = 'p ' + cls;
+    d.style.clipPath = d.style.webkitClipPath = clip;
+    board.appendChild(d);
+    return d;
+  }
+
+  // Layers
+  const under = mk('under', 'none');
+  const mirror = pts => pts.map(p => [1 - p[0], p[1]]);
+  const tris = DEFS.map(d => {
+    const [a,b,c] = d.pts;
+    // apex mirrored over the hinge edge (edges are vertical or horizontal)
+    const refl = a[0] === b[0] ? [2*a[0] - c[0], c[1]] : [c[0], 2*a[1] - c[1]];
+    const el = mk('tri', poly(grow(d.pts, .015)));
+    el.dataset.n = d.n;
+    // the other side of the same piece of paper (from the back photo)
+    const bk = mk('bk', poly(grow(mirror(d.pts), .006)));
+    const tip = mk('tip', poly(grow([a,b,refl].map(toBig), .006)));
+    return { ...d, el, bk, tip, refl };
+  });
+  const back = mk('back', poly([[.5,0],[1,.5],[.5,1],[0,.5]]));
+
+  // The finger pockets: a second square of paper behind each quarter, joined to it along
+  // the quarter's two outer edges. Its tip is where the finger pushes in.
+  // Texture: the pocket squares cut from the closed photo (two real pockets, side by side).
+  const POCKETS = [
+    { X:'TL', m:['T','L'], tile:0 }, { X:'TR', m:['R','T'], tile:1 },
+    { X:'BR', m:['B','R'], tile:0 }, { X:'BL', m:['L','B'], tile:1 },
+  ];
+  const TIP = [0,0], SIDE_A = [1,0], INNER = [1,1], SIDE_B = [0,1];
+  const pockets = POCKETS.flatMap(pk => [0,1].map(f => {
+    const u = [TIP, INNER, f ? SIDE_B : SIDE_A];
+    const el = mk('pk', poly(grow(u, .03)));
+    el.style.backgroundPosition = pk.tile ? '100% 0' : '0 0';
+    return { ...pk, f, u, el };
+  }));
+
+  // The folded sheet is one piece: all 8 faces share the 9 real paper points.
+  const LABELS = [
+    ['L','BL','C'], ['TL','L','C'], ['TL','T','C'], ['T','TR','C'],
+    ['TR','R','C'], ['R','BR','C'], ['B','BR','C'], ['BL','B','C'],
+  ];
+  const vertsFrom = pos => LABELS.flatMap(l => l.flatMap(k => pos[k]));
+
+  // Poses, in units of the square, centred on C, z toward the viewer
+  const FLAT = {
+    TL:[-.5,-.5,0], T:[0,-.5,0], TR:[.5,-.5,0], R:[.5,0,0],
+    BR:[.5,.5,0], B:[0,.5,0], BL:[-.5,.5,0], L:[-.5,0,0], C:[0,0,0],
+  };
+  // Folded shapes, copied from the photos of the real one (positions read off the photos).
+  // Open: the pinched corners sit at the two ends of the slit, the open creases at the
+  // sides, the shut creases hang down inside the slit, the centre is deep, and each
+  // pocket is a big outer face from a slit end out to its peak (K).
+  // Closed: the four corners meet in the middle and the pockets lie on top.
+  const OPEN_V = { // III IV VII VIII open, slit runs left to right
+    C:[0,0,-.42], T:[0,-.32,-.02], B:[0,.32,-.02], L:[-.32,0,-.45], R:[.32,0,-.45],
+    TL:[-.5,-.025,0], BL:[-.5,.025,0], TR:[.5,-.025,0], BR:[.5,.025,0],
+    KTL:[-.3,-.43,.03], KTR:[.3,-.43,.03], KBR:[.3,.43,.03], KBL:[-.3,.43,.03],
+  };
+  const OPEN_H = { // II I V VI open, slit runs top to bottom
+    C:[0,0,-.42], L:[-.32,0,-.02], R:[.32,0,-.02], T:[0,-.32,-.45], B:[0,.32,-.45],
+    TL:[-.025,-.5,0], TR:[.025,-.5,0], BL:[-.025,.5,0], BR:[.025,.5,0],
+    KTL:[-.43,-.3,.03], KTR:[.43,-.3,.03], KBR:[.43,.3,.03], KBL:[-.43,.3,.03],
+  };
+  const CLOSED = {
+    C:[0,0,-.45], T:[0,-.36,-.2], R:[.36,0,-.2], B:[0,.36,-.2], L:[-.36,0,-.2],
+    TL:[-.02,-.02,.1], TR:[.02,-.02,.1], BR:[.02,.02,.1], BL:[-.02,.02,.1],
+    KTL:[-.42,-.42,-.06], KTR:[.42,-.42,-.06], KBR:[.42,.42,-.06], KBL:[-.42,.42,-.06],
+  };
+  FLAT.KTL = FLAT.KTR = FLAT.KBR = FLAT.KBL = [0,0,-.02]; // pockets tucked behind the flat sheet
+  const tipsFrom = pos => ['KTL','KTR','KBR','KBL'].flatMap(k => pos[k]);
+
+  // Animated parameters
+  const P = { pk: 0, v: vertsFrom(FLAT), k: tipsFrom(FLAT), op:[1,1,1,1,1,1,1,1], lift:[0,0,0,0,0,0,0,0], tilt:0, scale:1, flip:0, under:0 };
+
+  const rotAround = (m, px, py, ax, ay, deg) => m.translateSelf(px, py, 0).rotateAxisAngleSelf(ax, ay, 0, deg).translateSelf(-px, -py, 0);
+
+  // Pick rotation signs so every lift comes up toward the viewer.
+  function signFor(axis, pivot, probe) {
+    const m = rotAround(new DOMMatrix(), pivot[0], pivot[1], axis[0], axis[1], 30);
+    return m.transformPoint(new DOMPoint(probe[0], probe[1], 0)).z > 0 ? 1 : -1;
+  }
+  tris.forEach(t => {
+    const [a,b,c] = t.pts;
+    const cen = [(a[0]+b[0]+c[0])/3, (a[1]+b[1]+c[1])/3];
+    t.hingeAxis = [b[0]-a[0], b[1]-a[1]];
+    t.liftSign = signFor(t.hingeAxis, a, cen);
+  });
+
+  // Affine map that sends the flat triangle (u) onto three 3D points (q). Returns matrix + facing.
+  function faceMatrix(u, q) {
+    const e1 = [u[1][0]-u[0][0], u[1][1]-u[0][1]], e2 = [u[2][0]-u[0][0], u[2][1]-u[0][1]];
+    const E1 = [0,1,2].map(k => q[1][k]-q[0][k]), E2 = [0,1,2].map(k => q[2][k]-q[0][k]);
+    let N = [E1[1]*E2[2]-E1[2]*E2[1], E1[2]*E2[0]-E1[0]*E2[2], E1[0]*E2[1]-E1[1]*E2[0]];
+    const det = e1[0]*e2[1] - e1[1]*e2[0];
+    const nl = (Math.hypot(...N) || 1) * Math.sign(det); N = N.map(x => x/nl); // keep the printed side facing out
+    const i00 = e2[1]/det, i01 = -e2[0]/det, i10 = -e1[1]/det, i11 = e1[0]/det; // inverse of [e1 e2]
+    const A = [0,1,2].map(r => [E1[r]*i00 + E2[r]*i10, E1[r]*i01 + E2[r]*i11, N[r]]);
+    const t = [0,1,2].map(r => q[0][r] - A[r][0]*u[0][0] - A[r][1]*u[0][1]);
+    const m = new DOMMatrix([A[0][0],A[1][0],A[2][0],0, A[0][1],A[1][1],A[2][1],0, A[0][2],A[1][2],A[2][2],0, t[0],t[1],t[2],1]);
+    return { m, nz: N[2] };
+  }
+
+  function render() {
+    board.style.width = board.style.height = S + 'px';
+    board.style.transform = `translate(-50%,-50%) scale(${P.scale}) rotateX(${P.tilt}deg) rotateY(${P.flip}deg)`;
+    tris.forEach((t, i) => {
+      const lift = P.lift[i];
+      const u = t.pts.map(p => [p[0]*S, p[1]*S]);
+      const q = [0,1,2].map(j => { const o = (i*3 + j)*3; return [(P.v[o]+.5)*S, (P.v[o+1]+.5)*S, P.v[o+2]*S]; });
+      const { m, nz } = faceMatrix(u, q);
+      const a = t.pts[0];
+      // front half of the flap: 0 -> 90
+      const mf = DOMMatrix.fromMatrix(m);
+      rotAround(mf, a[0]*S, a[1]*S, t.hingeAxis[0], t.hingeAxis[1], t.liftSign * Math.min(lift, 90));
+      t.el.style.width = t.el.style.height = S + 'px';
+      t.el.style.transform = mf.toString();
+      t.mat = mf;
+      // other side of the paper: same place, facing the other way
+      t.bk.style.width = t.bk.style.height = S + 'px';
+      t.bk.style.transform = DOMMatrix.fromMatrix(mf).translateSelf(S, 0, 0).scaleSelf(-1, 1, -1).toString();
+      t.bk.style.visibility = lift > 0 || P.pk < .5 ? 'hidden' : 'visible';
+      t.el.style.visibility = lift >= 90 || P.op[i] < .02 ? 'hidden' : 'visible';
+      t.el.style.opacity = P.op[i].toFixed(3);
+      // back of the flap (the name): 90 -> 180
+      const mb = DOMMatrix.fromMatrix(m);
+      rotAround(mb, a[0]*S, a[1]*S, t.hingeAxis[0], t.hingeAxis[1], t.liftSign * (Math.max(lift, 90) - 180));
+      mb.translateSelf(-S/2, -S/2, 0);
+      t.tip.style.width = t.tip.style.height = 2*S + 'px';
+      t.tip.style.transform = mb.toString();
+      t.tip.style.visibility = lift > 90 ? 'visible' : 'hidden';
+    });
+    // pockets
+    const named = {};
+    LABELS.forEach((l, i) => l.forEach((k, j) => { const o = (i*3 + j)*3; named[k] = [P.v[o], P.v[o+1], P.v[o+2]]; }));
+    const sub = (p, q) => [p[0]-q[0], p[1]-q[1], p[2]-q[2]];
+    const crs = (p, q) => [p[1]*q[2]-p[2]*q[1], p[2]*q[0]-p[0]*q[2], p[0]*q[1]-p[1]*q[0]];
+    const pocketOp = Math.max(0, P.pk);
+    pockets.forEach((pk, j) => {
+      const X = named[pk.X], M1 = named[pk.m[0]], M2 = named[pk.m[1]];
+      const o = Math.floor(j/2)*3, K = [P.k[o], P.k[o+1], P.k[o+2]];
+      const q = [K, X, pk.f ? M2 : M1].map(p => [(p[0]+.5)*S, (p[1]+.5)*S, p[2]*S]);
+      const { m, nz } = faceMatrix(pk.u.map(p => [p[0]*S, p[1]*S]), q);
+      pk.el.style.width = pk.el.style.height = S + 'px';
+      pk.el.style.transform = m.toString();
+      pk.mat = m;
+      pk.el.style.opacity = pocketOp.toFixed(3);
+      pk.el.style.visibility = pocketOp < .02 ? 'hidden' : 'visible';
+    });
+    // the paper under the flaps
+    under.style.width = under.style.height = S + 'px';
+    under.style.backgroundSize = '200% 200%';
+    under.style.backgroundPosition = '50% 50%';
+    under.style.transform = 'translateZ(-0.5px)';
+    under.style.opacity = P.under;
+    under.style.visibility = P.under < .02 ? 'hidden' : 'visible';
+    // back of the whole unfolded sheet
+    back.style.width = back.style.height = 2*S + 'px';
+    back.style.transform = new DOMMatrix().translateSelf(S/2, S/2, 0).rotateSelf(0, 180, 0).translateSelf(-S, -S, 0).toString();
+  }
+
+  // Tweening
+  const ease = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+  function tween(to, ms) {
+    const from = JSON.parse(JSON.stringify(P));
+    return new Promise(res => {
+      const t0 = performance.now();
+      function step(now) {
+        const k = Math.min(1, (now - t0) / ms), e = ease(k);
+        for (const key in to) {
+          if (Array.isArray(to[key])) P[key] = to[key].map((v, i) => from[key][i] + (v - from[key][i]) * e);
+          else P[key] = from[key] + (to[key] - from[key]) * e;
+        }
+        render();
+        k < 1 ? requestAnimationFrame(step) : res();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  // Poses
+  const TILT = 12;
+  const openPose = set => ({
+    v: vertsFrom(set === SET_V ? OPEN_V : OPEN_H), k: tipsFrom(set === SET_V ? OPEN_V : OPEN_H),
+    op: DEFS.map(() => 1),
+    lift: [0,0,0,0,0,0,0,0], tilt: TILT, scale: 1, under: 0, pk: 1,
+  });
+  const closedPose = () => ({ pk: 1, v: vertsFrom(CLOSED), k: tipsFrom(CLOSED), op: DEFS.map(() => 1), tilt: TILT, scale: 1 });
+  const flatPose = () => ({ pk: 0, v: vertsFrom(FLAT), k: tipsFrom(FLAT), op: DEFS.map(() => 1), tilt: 0, under: 1 });
+
+  let state = 'busy', current = SET_V, unfolded = false;
+  const form = document.getElementById('count');
+  for (let i = 1; i <= 21; i++) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = i;
+    b.addEventListener('click', () => { if (state === 'enter') play(i); });
+    form.appendChild(b);
+  }
+
+  function setClickable(set) {
+    tris.forEach(t => t.el.classList.toggle('on', !!set && set.includes(t.n)));
+  }
+  function showEntry() {
+    statusEl.textContent = 'PICK A NUMBER'; form.hidden = false; state = 'enter';
+  }
+
+  // Closed, waiting for a number.
+  async function toClosed() {
+    state = 'busy'; setClickable(null);
+    await tween({ ...closedPose(), lift: [0,0,0,0,0,0,0,0], under: 0 }, 650);
+    showEntry();
+  }
+
+  // Open and close once per count, switching direction each time, then open and stay open.
+  async function play(times) {
+    state = 'busy'; form.hidden = true; statusEl.textContent = '';
+    for (let i = 0; i < times; i++) {
+      await tween(openPose(i % 2 ? SET_H : SET_V), 300);
+      await tween(closedPose(), 260);
+    }
+    current = times % 2 ? SET_H : SET_V;
+    await tween(openPose(current), 420);
+    setClickable(current); state = 'pick';
+    statusEl.textContent = 'PICK A NUMBER';
+  }
+
+  // The chosen flap opens.
+  async function reveal(n) {
+    state = 'busy'; setClickable(null); statusEl.textContent = '';
+    await tween({ pk: 0 }, 220);
+    await tween({ ...flatPose(), scale: 1 }, 700);
+    await tween({ lift: DEFS.map(d => d.n === n ? 180 : 0) }, 1100);
+    state = 'done';
+  }
+
+  async function closeReveal() {
+    state = 'busy';
+    await tween({ lift: [0,0,0,0,0,0,0,0] }, 800);
+    toClosed();
+  }
+
+
+  // Project a face's corners to the screen (same math as the CSS) and test the click against them.
+  function screenPts(t) {
+    const W = innerWidth, H = innerHeight, d = 1800, ox = W/2, oy = H*.4;
+    const Tb = new DOMMatrix().translateSelf(-S/2, -S/2, 0).scaleSelf(P.scale, P.scale, P.scale)
+      .rotateSelf(P.tilt, 0, 0).rotateSelf(0, P.flip, 0);
+    return t.pts.map(p => {
+      const q = t.mat.transformPoint(new DOMPoint(p[0]*S, p[1]*S, 0));
+      const r = Tb.transformPoint(new DOMPoint(q.x - S/2, q.y - S/2, q.z));
+      const x = W/2 + r.x + S/2, y = H/2 + r.y + S/2, k = d / (d - r.z);
+      return [ox + (x-ox)*k, oy + (y-oy)*k, r.z];
+    });
+  }
+  function inside(px, py, [a,b,c]) {
+    const s = (p, q, r) => (p[0]-r[0])*(q[1]-r[1]) - (q[0]-r[0])*(p[1]-r[1]);
+    const d1 = s([px,py],a,b), d2 = s([px,py],b,c), d3 = s([px,py],c,a);
+    return !((d1<0||d2<0||d3<0) && (d1>0||d2>0||d3>0));
+  }
+  function hit(x, y) {
+    let best = null, bestZ = -Infinity;
+    if (P.pk > .5) pockets.forEach(pk => {
+      if (!pk.mat) return;
+      const sp = screenPts({ mat: pk.mat, pts: pk.u });
+      const z = (sp[0][2]+sp[1][2]+sp[2][2])/3;
+      if (inside(x, y, sp) && z > bestZ) { best = null; bestZ = z; }
+    });
+    tris.forEach(t => {
+      if (!t.el.classList.contains('on') || !t.mat) return;
+      const sp = screenPts(t);
+      // only faces whose printed side is turned toward you
+      const cross = (sp[1][0]-sp[0][0])*(sp[2][1]-sp[0][1]) - (sp[1][1]-sp[0][1])*(sp[2][0]-sp[0][0]);
+      const [a,b,c] = t.pts, src = (b[0]-a[0])*(c[1]-a[1]) - (b[1]-a[1])*(c[0]-a[0]);
+      if (Math.sign(cross) !== Math.sign(src) || Math.abs(cross) < 40) return;
+      const z = (sp[0][2]+sp[1][2]+sp[2][2])/3;
+      if (inside(x, y, sp) && z > bestZ) { best = t; bestZ = z; }
+    });
+    return best;
+  }
+
+  document.getElementById('stage').addEventListener('click', e => {
+    if (state === 'done') { closeReveal(); return; }
+    if (state !== 'pick') return;
+    const t = hit(e.clientX, e.clientY);
+    if (t) reveal(t.n);
+  });
+  document.getElementById('stage').addEventListener('mousemove', e => {
+    document.getElementById('stage').style.cursor = state === 'pick' && hit(e.clientX, e.clientY) ? 'pointer' : '';
+  });
+
+  function size() {
+    S = Math.round(Math.min(window.innerWidth * 0.46, window.innerHeight * 0.44, 560)); // same size folded or flat; the unfolded sheet (2x) still fits
+    render();
+  }
+  window.addEventListener('resize', size);
+  size();
+  Object.assign(P, closedPose(), { under: 0 });
+  render();
+  showEntry();
+})();
+</script>
+</body>
+</html>
