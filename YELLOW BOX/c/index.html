@@ -14,15 +14,8 @@
   #ui button[hidden], #status:empty, #count[hidden] { display: none; }
   #count { display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 420px; }
   #count button { font: inherit; color: var(--fg); background: none; border: 0; padding: 2px 0; cursor: pointer; letter-spacing: inherit; }
-  #stage { position: fixed; inset: 0; perspective: 1800px; perspective-origin: 50% 40%; }
-  #board { position: absolute; left: 50%; top: 50%; transform-style: preserve-3d; }
-  .p { position: absolute; left: 0; top: 0; transform-origin: 0 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background-repeat: no-repeat; background-size: 100% 100%; }
-  .tri { background-image: url(inside.jpg?v=4); }
-  .tip, .under { background-image: url(front.jpg); }
-  .back, .bk { background-image: url(back.jpg); }
-  .bk { background-size: 200% 200%; background-position: 50% 50%; }
-  .p { pointer-events: none; }
-  .pk { background-image: url(pockets.jpg?v=3); background-size: 200% 100%; backface-visibility: visible; -webkit-backface-visibility: visible; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; }
 </style>
 </head>
 <body>
@@ -30,10 +23,11 @@
   <div id="status"></div>
   <div id="count"></div>
 </div>
-<div id="stage"><div id="board"></div></div>
+<div id="stage"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (() => {
-  const board = document.getElementById('board');
+  const stage = document.getElementById('stage');
   const statusEl = document.getElementById('status');
 
   // Board coordinates are fractions of the closed square (0..1).
@@ -60,29 +54,64 @@
   const poly = pts => 'polygon(' + pts.map(p => (p[0]*100).toFixed(3)+'% '+(p[1]*100).toFixed(3)+'%').join(',') + ')';
   const toBig = p => [(p[0]+.5)/2, (p[1]+.5)/2]; // board fraction -> fraction of the 2x unfolded sheet
 
-  function mk(cls, clip) {
-    const d = document.createElement('div');
-    d.className = 'p ' + cls;
-    d.style.clipPath = d.style.webkitClipPath = clip;
-    board.appendChild(d);
-    return d;
+  // WebGL: every piece of paper is a flat polygon cut from one of the photos.
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x000000, 1);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const DIST = 1800; // camera distance in px, like a CSS perspective
+  const camera = new THREE.PerspectiveCamera(45, 1, 1, 10000);
+  camera.position.set(0, 0, DIST);
+  // show the paper only once every photo has loaded (no black first frame)
+  renderer.domElement.style.visibility = 'hidden';
+  const manager = new THREE.LoadingManager(() => { renderer.domElement.style.visibility = 'visible'; draw(); });
+  const loader = new THREE.TextureLoader(manager);
+  const tex = url => {
+    const t = loader.load(url, () => draw());
+    t.encoding = THREE.sRGBEncoding;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return t;
+  };
+  const TEX = { inside: tex('inside.jpg?v=4'), front: tex('front.jpg'), back: tex('back.jpg'), pockets: tex('pockets.jpg?v=3') };
+
+  // A face: polygon in fractions of its element (size = S * span), with texture coords.
+  // side: FrontSide = one-sided paper face, DoubleSide = pockets.
+  function mk(texture, polyFrac, span, uvOf, side) {
+    const n = polyFrac.length, tri = [];
+    // printed side faces you when the piece keeps its own corner order on screen;
+    // WebGL's y axis points up, so pieces listed the other way round get reversed
+    let area = 0;
+    polyFrac.forEach((p, i) => { const q = polyFrac[(i + 1) % n]; area += p[0]*q[1] - q[0]*p[1]; });
+    for (let i = 1; i < n - 1; i++) area > 0 ? tri.push(0, i + 1, i) : tri.push(0, i, i + 1);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(polyFrac.flatMap(p => { const [u, v] = uvOf(p); return [u, 1 - v]; })), 2));
+    g.setIndex(tri);
+    const mat = new THREE.MeshBasicMaterial({ map: texture, side, transparent: true });
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    return { mesh, polyFrac, span };
   }
+  const FRONT = THREE.FrontSide, BOTH = THREE.DoubleSide;
+  const same = p => p, half = p => [.25 + p[0]/2, .25 + p[1]/2];
 
   // Layers
-  const under = mk('under', 'none');
+  const under = mk(TEX.front, [[0,0],[1,0],[1,1],[0,1]], 1, half, FRONT);
   const mirror = pts => pts.map(p => [1 - p[0], p[1]]);
   const tris = DEFS.map(d => {
     const [a,b,c] = d.pts;
     // apex mirrored over the hinge edge (edges are vertical or horizontal)
     const refl = a[0] === b[0] ? [2*a[0] - c[0], c[1]] : [c[0], 2*a[1] - c[1]];
-    const el = mk('tri', poly(grow(d.pts, .015)));
-    el.dataset.n = d.n;
+    const el = mk(TEX.inside, grow(d.pts, .006), 1, same, FRONT);
     // the other side of the same piece of paper (from the back photo)
-    const bk = mk('bk', poly(grow(mirror(d.pts), .006)));
-    const tip = mk('tip', poly(grow([a,b,refl].map(toBig), .006)));
-    return { ...d, el, bk, tip, refl };
+    const bk = mk(TEX.back, grow(mirror(d.pts), .006), 1, half, FRONT);
+    const tip = mk(TEX.front, grow([a,b,refl].map(toBig), .006), 2, same, FRONT);
+    return { ...d, el, bk, tip, refl, on: false };
   });
-  const back = mk('back', poly([[.5,0],[1,.5],[.5,1],[0,.5]]));
+  const back = mk(TEX.back, [[.5,0],[1,.5],[.5,1],[0,.5]], 2, same, FRONT);
 
   // The finger pockets: a second square of paper behind each quarter, joined to it along
   // the quarter's two outer edges. Its tip is where the finger pushes in.
@@ -94,8 +123,7 @@
   const TIP = [0,0], SIDE_A = [1,0], INNER = [1,1], SIDE_B = [0,1];
   const pockets = POCKETS.flatMap(pk => [0,1].map(f => {
     const u = [TIP, INNER, f ? SIDE_B : SIDE_A];
-    const el = mk('pk', poly(grow(u, .03)));
-    el.style.backgroundPosition = pk.tile ? '100% 0' : '0 0';
+    const el = mk(TEX.pockets, grow(u, .01), 1, p => [(pk.tile + p[0]) / 2, p[1]], BOTH);
     return { ...pk, f, u, el };
   }));
 
@@ -165,63 +193,61 @@
     return { m, nz: N[2] };
   }
 
+  // Board transform (scale, tilt, flip) about the board centre, as the old CSS did.
+  const boardMatrix = () => new DOMMatrix().scaleSelf(P.scale, P.scale, P.scale).rotateSelf(P.tilt, 0, 0).rotateSelf(0, P.flip, 0);
+  let RB = new DOMMatrix();
+  function place(face, m, visible, opacity = 1) {
+    face.mesh.visible = visible && opacity > .01;
+    if (!face.mesh.visible) return;
+    face.mesh.material.opacity = opacity;
+    const pos = face.mesh.geometry.attributes.position, size = S * face.span;
+    face.polyFrac.forEach((p, i) => {
+      const q = m.transformPoint(new DOMPoint(p[0]*size, p[1]*size, 0));
+      const r = RB.transformPoint(new DOMPoint(q.x - S/2, q.y - S/2, q.z));
+      pos.setXYZ(i, r.x, -r.y, r.z);
+    });
+    pos.needsUpdate = true;
+  }
+
   function render() {
-    board.style.width = board.style.height = S + 'px';
-    board.style.transform = `translate(-50%,-50%) scale(${P.scale}) rotateX(${P.tilt}deg) rotateY(${P.flip}deg)`;
+    RB = boardMatrix();
     tris.forEach((t, i) => {
       const lift = P.lift[i];
       const u = t.pts.map(p => [p[0]*S, p[1]*S]);
       const q = [0,1,2].map(j => { const o = (i*3 + j)*3; return [(P.v[o]+.5)*S, (P.v[o+1]+.5)*S, P.v[o+2]*S]; });
-      const { m, nz } = faceMatrix(u, q);
+      const { m } = faceMatrix(u, q);
       const a = t.pts[0];
       // front half of the flap: 0 -> 90
       const mf = DOMMatrix.fromMatrix(m);
       rotAround(mf, a[0]*S, a[1]*S, t.hingeAxis[0], t.hingeAxis[1], t.liftSign * Math.min(lift, 90));
-      t.el.style.width = t.el.style.height = S + 'px';
-      t.el.style.transform = mf.toString();
       t.mat = mf;
+      place(t.el, mf, lift < 90, P.op[i]);
       // other side of the paper: same place, facing the other way
-      t.bk.style.width = t.bk.style.height = S + 'px';
-      t.bk.style.transform = DOMMatrix.fromMatrix(mf).translateSelf(S, 0, 0).scaleSelf(-1, 1, -1).toString();
-      t.bk.style.visibility = lift > 0 || P.pk < .5 ? 'hidden' : 'visible';
-      t.el.style.visibility = lift >= 90 || P.op[i] < .02 ? 'hidden' : 'visible';
-      t.el.style.opacity = P.op[i].toFixed(3);
+      place(t.bk, DOMMatrix.fromMatrix(mf).translateSelf(S, 0, 0).scaleSelf(-1, 1, -1), lift === 0 && P.pk >= .5);
       // back of the flap (the name): 90 -> 180
       const mb = DOMMatrix.fromMatrix(m);
       rotAround(mb, a[0]*S, a[1]*S, t.hingeAxis[0], t.hingeAxis[1], t.liftSign * (Math.max(lift, 90) - 180));
       mb.translateSelf(-S/2, -S/2, 0);
-      t.tip.style.width = t.tip.style.height = 2*S + 'px';
-      t.tip.style.transform = mb.toString();
-      t.tip.style.visibility = lift > 90 ? 'visible' : 'hidden';
+      place(t.tip, mb, lift > 90);
     });
     // pockets
     const named = {};
     LABELS.forEach((l, i) => l.forEach((k, j) => { const o = (i*3 + j)*3; named[k] = [P.v[o], P.v[o+1], P.v[o+2]]; }));
-    const sub = (p, q) => [p[0]-q[0], p[1]-q[1], p[2]-q[2]];
-    const crs = (p, q) => [p[1]*q[2]-p[2]*q[1], p[2]*q[0]-p[0]*q[2], p[0]*q[1]-p[1]*q[0]];
-    const pocketOp = Math.max(0, P.pk);
     pockets.forEach((pk, j) => {
       const X = named[pk.X], M1 = named[pk.m[0]], M2 = named[pk.m[1]];
       const o = Math.floor(j/2)*3, K = [P.k[o], P.k[o+1], P.k[o+2]];
       const q = [K, X, pk.f ? M2 : M1].map(p => [(p[0]+.5)*S, (p[1]+.5)*S, p[2]*S]);
-      const { m, nz } = faceMatrix(pk.u.map(p => [p[0]*S, p[1]*S]), q);
-      pk.el.style.width = pk.el.style.height = S + 'px';
-      pk.el.style.transform = m.toString();
+      const { m } = faceMatrix(pk.u.map(p => [p[0]*S, p[1]*S]), q);
       pk.mat = m;
-      pk.el.style.opacity = pocketOp.toFixed(3);
-      pk.el.style.visibility = pocketOp < .02 ? 'hidden' : 'visible';
+      place(pk.el, m, true, Math.max(0, P.pk));
     });
     // the paper under the flaps
-    under.style.width = under.style.height = S + 'px';
-    under.style.backgroundSize = '200% 200%';
-    under.style.backgroundPosition = '50% 50%';
-    under.style.transform = 'translateZ(-0.5px)';
-    under.style.opacity = P.under;
-    under.style.visibility = P.under < .02 ? 'hidden' : 'visible';
+    place(under, new DOMMatrix().translateSelf(0, 0, -0.5), true, P.under);
     // back of the whole unfolded sheet
-    back.style.width = back.style.height = 2*S + 'px';
-    back.style.transform = new DOMMatrix().translateSelf(S/2, S/2, 0).rotateSelf(0, 180, 0).translateSelf(-S, -S, 0).toString();
+    place(back, new DOMMatrix().translateSelf(S/2, S/2, 0).rotateSelf(0, 180, 0).translateSelf(-S, -S, 0), true);
+    draw();
   }
+  function draw() { renderer.render(scene, camera); }
 
   // Tweening
   const ease = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
@@ -262,7 +288,7 @@
   }
 
   function setClickable(set) {
-    tris.forEach(t => t.el.classList.toggle('on', !!set && set.includes(t.n)));
+    tris.forEach(t => { t.on = !!set && set.includes(t.n); });
   }
   function showEntry() {
     statusEl.textContent = 'PICK A NUMBER'; form.hidden = false; state = 'enter';
@@ -278,9 +304,10 @@
   // Open and close once per count, switching direction each time, then open and stay open.
   async function play(times) {
     state = 'busy'; form.hidden = true; statusEl.textContent = '';
+    const fast = times > 5;
     for (let i = 0; i < times; i++) {
-      await tween(openPose(i % 2 ? SET_H : SET_V), 300);
-      await tween(closedPose(), 260);
+      await tween(openPose(i % 2 ? SET_H : SET_V), fast ? 130 : 300);
+      await tween(closedPose(), fast ? 110 : 260);
     }
     current = times % 2 ? SET_H : SET_V;
     await tween(openPose(current), 420);
@@ -306,14 +333,12 @@
 
   // Project a face's corners to the screen (same math as the CSS) and test the click against them.
   function screenPts(t) {
-    const W = innerWidth, H = innerHeight, d = 1800, ox = W/2, oy = H*.4;
-    const Tb = new DOMMatrix().translateSelf(-S/2, -S/2, 0).scaleSelf(P.scale, P.scale, P.scale)
-      .rotateSelf(P.tilt, 0, 0).rotateSelf(0, P.flip, 0);
+    const W = innerWidth, H = innerHeight, Rb = boardMatrix();
     return t.pts.map(p => {
       const q = t.mat.transformPoint(new DOMPoint(p[0]*S, p[1]*S, 0));
-      const r = Tb.transformPoint(new DOMPoint(q.x - S/2, q.y - S/2, q.z));
-      const x = W/2 + r.x + S/2, y = H/2 + r.y + S/2, k = d / (d - r.z);
-      return [ox + (x-ox)*k, oy + (y-oy)*k, r.z];
+      const r = Rb.transformPoint(new DOMPoint(q.x - S/2, q.y - S/2, q.z));
+      const k = DIST / (DIST - r.z);
+      return [W/2 + r.x*k, H/2 + r.y*k, r.z];
     });
   }
   function inside(px, py, [a,b,c]) {
@@ -330,7 +355,7 @@
       if (inside(x, y, sp) && z > bestZ) { best = null; bestZ = z; }
     });
     tris.forEach(t => {
-      if (!t.el.classList.contains('on') || !t.mat) return;
+      if (!t.on || !t.mat) return;
       const sp = screenPts(t);
       // only faces whose printed side is turned toward you
       const cross = (sp[1][0]-sp[0][0])*(sp[2][1]-sp[0][1]) - (sp[1][1]-sp[0][1])*(sp[2][0]-sp[0][0]);
@@ -353,7 +378,11 @@
   });
 
   function size() {
-    S = Math.round(Math.min(window.innerWidth * 0.46, window.innerHeight * 0.44, 560)); // same size folded or flat; the unfolded sheet (2x) still fits
+    S = Math.round(Math.min(window.innerWidth * 0.46, window.innerHeight * 0.44, 560)); // same size folded or flat
+    renderer.setSize(innerWidth, innerHeight);
+    camera.aspect = innerWidth / innerHeight;
+    camera.fov = 2 * Math.atan(innerHeight / 2 / DIST) * 180 / Math.PI; // 1 px = 1 px at the paper
+    camera.updateProjectionMatrix();
     render();
   }
   window.addEventListener('resize', size);
