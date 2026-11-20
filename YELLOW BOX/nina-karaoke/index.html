@@ -1,0 +1,192 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bellies · karaoke</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* karaoke: the women of the 1870s call each line; Cecilia's calligraphy is the words */
+:root{color-scheme:dark}
+html,body{height:100%}
+body{background:#000;margin:0;overflow:hidden;font-family:Georgia,'Times New Roman',serif;color:#f4ecdc}
+.layer{position:fixed;inset:0;overflow:hidden;transition:opacity 1.2s ease}
+.layer.off{opacity:0}
+.layer img{position:absolute;opacity:0;will-change:opacity,transform;
+  transition:opacity 1.8s ease,transform 0s linear 1.8s;transform:scale(1)}
+.layer img.on{opacity:1;transition:opacity 1.8s ease,transform 16s linear;transform:scale(1.1)}
+#trip{display:flex}
+#trip .col{position:relative;flex:1;overflow:hidden;opacity:0;transition:opacity .45s ease}
+#trip .col.on{opacity:1}
+#trip img{opacity:1;transition:transform 6s linear;transform:scale(1)}
+#trip .col.on img{transform:scale(1.08)}
+#shade{position:fixed;inset:0;pointer-events:none;
+  background:linear-gradient(to bottom,transparent 45%,rgba(0,0,0,.8) 100%)}
+#lyrics{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+#start{position:fixed;inset:0;cursor:pointer}
+#start.gone{display:none}
+@media (prefers-reduced-motion:reduce){.layer img.on,#trip .col.on img{transform:scale(1)}}
+</style>
+
+<div id="main" class="layer" aria-hidden="true"></div>
+<div id="trip" class="layer off" aria-hidden="true"><div class="col"></div><div class="col"></div><div class="col"></div></div>
+<div id="shade"></div>
+<canvas id="lyrics" aria-label="Lyrics of Bellies by Nina Nastasia in Cecilia's calligraphy, karaoke style"></canvas>
+<div id="start" role="button" tabindex="0" aria-label="Start the song"></div>
+
+<script>
+(function(){
+'use strict';
+const DURATION=234.26;
+
+/* ---------- the women: paintings c. 1866–1882, Wikimedia Commons (public domain) ---------- */
+// fx, fy: where her face sits in the painting (fractions); z: how close we come
+const ART={
+  bar:     {f:'Edouard Manet, A Bar at the Folies-Bergère.jpg',w:3419,h:2553,fx:.45,fy:.18,z:1.5,c:'Édouard Manet, Un bar aux Folies-Bergère, 1882'},
+  violets: {f:'Edouard Manet - Berthe Morisot With a Bouquet of Violets - Google Art Project.jpg',w:2617,h:3552,fx:.46,fy:.36,z:1.2,c:'Édouard Manet, Berthe Morisot au bouquet de violettes, 1872'},
+  railway: {f:'Edouard Manet - The Railway - Google Art Project.jpg',w:11364,h:9258,fx:.23,fy:.22,z:1.7,c:'Édouard Manet, Le Chemin de fer, 1873'},
+  loge:    {f:'La Loge Pierre-Auguste Renoir 1874.jpg',w:2362,h:2952,fx:.34,fy:.21,z:1.4,c:'Pierre-Auguste Renoir, La Loge, 1874'},
+  absinthe:{f:'Edgar Degas - In a Café - Google Art Project 2.jpg',w:3936,h:5400,fx:.5,fy:.18,z:1.5,c:'Edgar Degas, Dans un café (L’Absinthe), 1875–76'},
+  plum:    {f:'Edouard Manet - The Plum - National Gallery of Art.jpg',w:2675,h:4000,fx:.34,fy:.2,z:1.4,c:'Édouard Manet, La Prune, c. 1877'},
+  repos:   {f:'Édouard Manet - Le repos.jpg',w:2966,h:4000,fx:.6,fy:.28,z:1.5,c:'Édouard Manet, Le Repos, c. 1870'},
+  lady:    {f:'Édouard Manet - Young Lady in 1866 - Google Art Project.jpg',w:2704,h:3912,fx:.46,fy:.14,z:1.8,c:'Édouard Manet, Jeune dame en 1866'},
+  nana:    {f:'1877 Manet Nana anagoria.jpg',w:3580,h:4752,fx:.42,fy:.2,z:1.6,c:'Édouard Manet, Nana, 1877'},
+  cradle:  {f:'Berthe Morisot - The Cradle - Google Art Project.jpg',w:4105,h:5001,fx:.3,fy:.37,z:1.4,c:'Berthe Morisot, Le Berceau, 1872'},
+  balcony: {f:'Edouard Manet - The Balcony - Google Art Project.jpg',w:5804,h:8066,fx:.4,fy:.38,z:1.9,c:'Édouard Manet, Le Balcon, 1868–69'},
+  swing:   {f:'Auguste Renoir - The Swing - Google Art Project.jpg',w:3949,h:5163,fx:.65,fy:.28,z:1.7,c:'Pierre-Auguste Renoir, La Balançoire, 1876'},
+  fan:     {f:'Manet - Portrait of Berthe Morisot with a Fan, 1874.jpg',w:2399,h:3000,fx:.37,fy:.3,z:1.3,c:'Édouard Manet, Berthe Morisot à l’éventail, 1874'},
+  parasol: {f:'Claude Monet - Woman with a Parasol - Madame Monet and Her Son - Google Art Project.jpg',w:6001,h:7455,fx:.52,fy:.2,z:1.5,c:'Claude Monet, La Promenade, la femme à l’ombrelle, 1875'}
+};
+const PX=Math.min(devicePixelRatio,2)*Math.max(innerWidth,innerHeight)>1900?2400:1600;
+const src=a=>'https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(a.f)+'?width='+PX;
+
+// fit a painting into a box so her face sits a little above the middle, as close as z allows
+function place(img,a,bw,bh,zoom){
+  const ar=a.w/a.h;let w=bw,h=bw/ar;if(h<bh){h=bh;w=bh*ar;}
+  const z=bw<bh?Math.max(zoom,1):zoom;w*=z;h*=z;
+  let x=bw*.5-a.fx*w,y=bh*.38-a.fy*h;
+  x=Math.min(0,Math.max(bw-w,x));y=Math.min(0,Math.max(bh-h,y));
+  Object.assign(img.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px',transformOrigin:(a.fx*w)+'px '+(a.fy*h)+'px'});
+}
+const main=document.getElementById('main'),IMG={};
+Object.entries(ART).forEach(([k,a])=>{const im=new Image();im.alt='';im.decoding='async';im.src=src(a);main.appendChild(im);IMG[k]=im;});
+const trip=document.getElementById('trip'),cols=[...trip.children];
+const timgs=cols.map(c=>{const im=new Image();im.alt='';c.appendChild(im);return im;});
+function layout(){
+  Object.entries(ART).forEach(([k,a])=>place(IMG[k],a,innerWidth,innerHeight,a.z));
+  if(tripSet)tripSet.forEach((k,i)=>place(timgs[i],ART[k],cols[i].clientWidth,cols[i].clientHeight,ART[k].z*.85));
+}
+
+/* ---------- lyrics: Cecilia's calligraphy sheet, one line at a time ---------- */
+// approximate vertical centre of each written line on the sheet (original pixels)
+const LINE_Y=[128,230,363,470,670,782,883,1019,1240,1390,1524,1659,1824,1950,2090,2194,2297,2415];
+const LY=document.getElementById('lyrics'),lx=LY.getContext('2d');
+let LINES=null,INK=null;
+// each stroke of ink is traced as a whole and given to the written line it sits on, so loops and tails stay with their letters
+{const im=new Image();im.onload=()=>{
+  const W=im.naturalWidth,H=im.naturalHeight,c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');x.drawImage(im,0,0);const d=x.getImageData(0,0,W,H).data;
+  const ink=new Uint8Array(W*H);for(let i=0;i<W*H;i++){const v=255-(d[i*4]*.3+d[i*4+1]*.59+d[i*4+2]*.11);ink[i]=v>255?255:v<0?0:v;}
+  const lab=new Int32Array(W*H),stack=new Int32Array(W*H);const comps=[null];
+  for(let p0=0;p0<W*H;p0++){if(lab[p0]||ink[p0]<28)continue;
+    const id=comps.length;let sp=0,n=0,sx=0,sy=0,x0=W,x1=0,y0=H,y1=0;stack[sp++]=p0;lab[p0]=id;
+    while(sp){const p=stack[--sp],px=p%W,py=(p-px)/W;n++;sx+=px;sy+=py;if(px<x0)x0=px;if(px>x1)x1=px;if(py<y0)y0=py;if(py>y1)y1=py;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const qx=px+dx,qy=py+dy;if(qx<0||qy<0||qx>=W||qy>=H)continue;const q=qy*W+qx;if(!lab[q]&&ink[q]>=28){lab[q]=id;stack[sp++]=q;}}}
+    let line=-1;if(n>=8){const my=sy/n;let best=1e9;LINE_Y.forEach((ly,i)=>{const dd=Math.abs(ly-my);if(dd<best){best=dd;line=i;}});}
+    comps.push({line,cx:sx/n,x0,x1,y0,y1});}
+  const pieces=LINE_Y.map((_,i)=>({line:i,pick:()=>true}));
+  // the three "You wish" and the "i would" (sheet columns: each "You wish" ends before x 390)
+  pieces.push({line:8,pick:k=>k.cx<390},{line:8,pick:k=>k.cx>=390},{line:9,pick:k=>k.cx<390},{line:9,pick:k=>k.cx>=390});
+  const keep=pieces.map(pc=>{const set=new Uint8Array(comps.length);comps.forEach((k,id)=>{if(k&&k.line===pc.line&&pc.pick(k))set[id]=1;});return set;});
+  const box=pieces.map((pc,j)=>{const b={x0:W,x1:0,y0:H,y1:0};comps.forEach((k,id)=>{if(keep[j][id]){b.x0=Math.min(b.x0,k.x0);b.x1=Math.max(b.x1,k.x1);b.y0=Math.min(b.y0,k.y0);b.y1=Math.max(b.y1,k.y1);}});return b;});
+  const hi=new Image();hi.onload=()=>{const S=hi.naturalWidth/W;
+  const L0=box.map((b,j)=>{const K=keep[j],pad=3,bx=Math.max(0,b.x0-pad),by=Math.max(0,b.y0-pad),bw=Math.min(W,b.x1+pad+1)-bx,bh=Math.min(H,b.y1+pad+1)-by;
+    const cw=Math.round(bw*S),ch=Math.round(bh*S),o=document.createElement('canvas');o.width=cw;o.height=ch;const ox=o.getContext('2d');
+    ox.drawImage(hi,bx*S,by*S,bw*S,bh*S,0,0,cw,ch);const od=ox.getImageData(0,0,cw,ch),D=od.data;
+    for(let y=0;y<ch;y++){const sy=by+Math.min(bh-1,Math.floor(y/S));for(let xx=0;xx<cw;xx++){const sx=bx+Math.min(bw-1,Math.floor(xx/S)),sp=sy*W+sx,di=(y*cw+xx)*4;
+      let ok=lab[sp]>0&&K[lab[sp]]===1;
+      if(!ok&&!lab[sp]){for(let dy=-1;dy<=1&&!ok;dy++)for(let dx=-1;dx<=1;dx++){const q=sp+dy*W+dx;if(q>=0&&q<W*H&&lab[q]&&K[lab[q]]){ok=true;break;}}}
+      const v=255-(D[di]*.3+D[di+1]*.59+D[di+2]*.11);D[di]=D[di+1]=D[di+2]=0;D[di+3]=ok?Math.max(0,Math.min(255,(v-12)*1.3)):0;}}
+    ox.putImageData(od,0,0);return{c:o,w:bw,h:bh};});
+  // white ink, written in as it is sung
+  const tint=(c,col)=>{const o=document.createElement('canvas');o.width=c.width;o.height=c.height;const g=o.getContext('2d');g.drawImage(c,0,0);g.globalCompositeOperation='source-in';g.fillStyle=col;g.fillRect(0,0,o.width,o.height);return o;};
+  L0.forEach(L=>{L.lit=tint(L.c,'#fff');});
+  INK={w:Math.max(...box.slice(0,LINE_Y.length).map(b=>b.x1-b.x0))};LINES=L0;
+  };hi.src='lyrics-4x.jpg';
+};im.src='lyrics.jpg';}
+
+// [sheet line, start, end] in seconds of the song, from where each line is sung
+const CUES=[[0,11.1,15.2],[1,15.4,20.5],[2,20.7,24.9],[3,25.1,30.3],[4,32.3,35.9],[5,36.1,41.6],[6,42.3,46.1],[7,46.2,51.8],
+  [21,56.6,58.9],[10,59.1,61.1],[11,61.2,64.2],[12,64.4,68.1],[13,68.3,73.0],
+  [14,99.3,103.7],[15,103.9,110.2],[16,110.4,113.2],[17,113.4,118.2],
+  [21,147.6,149.5],[10,149.7,152.1],[11,152.3,155.1],[12,155.3,158.3],[13,158.5,164.6]];
+// "you wish, you wish, you wish": each lands on top of the last, very big, a woman appearing for each
+const STACKS=[{at:[52.6,54.5,55.7],end:56.6,w:['bar','fan','absinthe']},{at:[143.6,145.4,146.6],end:147.6,w:['violets','railway','nana']}];
+const COUNT_IN=[11.1,99.3,143.6];   // verses that start after a long rest: their first line waits on screen a little longer
+
+/* ---------- who calls when: a new woman for every line; slow changes in the instrumental parts; the barmaid at the close ---------- */
+const ORDER=['violets','railway','loge','absinthe','plum','repos','lady','nana','cradle','balcony','swing','fan','parasol'];
+let EV=[[0,'bar']];{let n=0;
+  CUES.forEach((c,i)=>{EV.push([c[1]-.6,ORDER[n++%ORDER.length]]);
+    const end=CUES[i+1]?CUES[i+1][1]:DURATION;
+    for(let s=c[2]+1.5;end-s>9;s+=8)if(!STACKS.some(z=>s>=z.at[0]-1&&s<z.end))EV.push([s,ORDER[n++%ORDER.length]]);});
+  EV=EV.filter(e=>e[0]<212);EV.push([212,'bar']);}
+const womanAt=t=>{let k=EV[0][1];for(const e of EV){if(e[0]<=t)k=e[1];else break;}return k;};
+
+/* ---------- drawing ---------- */
+let shown=null,tripSet=null,tripOn=-1;
+function show(k){if(k===shown)return;if(shown)IMG[shown].classList.remove('on');IMG[k].classList.add('on');shown=k;}
+
+function drawLine(L,cx,cy,sc,alpha,p){
+  const w=L.w*sc,h=L.h*sc,x=cx-w/2,y=cy-h/2;
+  lx.globalAlpha=alpha;
+  if(p>0){lx.save();lx.beginPath();lx.rect(x-4,y-20,w*p+4,h+40);lx.clip();
+    lx.shadowColor='#000';lx.shadowBlur=16;lx.drawImage(L.lit,x,y,w,h);
+    lx.shadowBlur=0;lx.drawImage(L.lit,x,y,w,h);lx.restore();}
+}
+function frame(){
+  const t=clock(),w=innerWidth,h=innerHeight,dpr=Math.min(devicePixelRatio,2);
+  if(LY.width!==Math.round(w*dpr)||LY.height!==Math.round(h*dpr)){LY.width=Math.round(w*dpr);LY.height=Math.round(h*dpr);}
+  lx.setTransform(1,0,0,1,0,0);lx.clearRect(0,0,LY.width,LY.height);lx.setTransform(dpr,0,0,dpr,0,0);lx.imageSmoothingQuality='high';
+  const g=Math.max(16,w*.05);
+  // the stacks: three women side by side, three "you wish" piled up very big
+  const S=STACKS.find(z=>t>=z.at[0]-.1&&t<z.end);
+  if(S){if(tripSet!==S.w){tripSet=S.w;S.w.forEach((k,i)=>{timgs[i].src=src(ART[k]);});layout();}
+    trip.classList.remove('off');main.classList.add('off');
+    const n=S.at.filter(a=>t>=a).length;if(n!==tripOn){cols.forEach((c,i)=>c.classList.toggle('on',i<n));tripOn=n;}
+    if(LINES)S.at.forEach((t0,k)=>{if(t<t0)return;const L=LINES[18+k],a=Math.min(1,(t-t0)/.2,(S.end-t)/.3),
+      sc=Math.min((w-2*g)/L.w,h*.6/L.h),p=Math.min(1,(t-t0)/Math.max(.4,((S.at[k+1]||S.end)-t0)*.8));
+      drawLine(L,w/2,h*.55,sc,Math.max(0,a),p);});
+  }else{
+    if(tripOn!==-1){trip.classList.add('off');main.classList.remove('off');cols.forEach(c=>c.classList.remove('on'));tripOn=-1;}
+    show(womanAt(t));
+    if(LINES){
+      // the current line, written in as it is sung
+      for(let i=0;i<CUES.length;i++){const c=CUES[i],prevEnd=i?CUES[i-1][2]:0,
+          lead=COUNT_IN.includes(c[1])?3:Math.min(1.2,Math.max(.2,c[1]-prevEnd));
+        if(t<c[1]-lead||t>=c[2]+.2)continue;
+        const L=LINES[c[0]],a=Math.min(1,(t-(c[1]-lead))/.35,(c[2]+.2-t)/.3),p=Math.min(1,Math.max(0,(t-c[1])/Math.max(.5,c[2]-c[1]-.25)));
+        const sc=Math.min(3*(w-2*g)/INK.w,(w-2*g)/L.w,h*.2/L.h),cy=h*.72;
+        drawLine(L,w/2,cy,sc,a,p);
+        break;}
+    }
+  }
+  lx.globalAlpha=1;
+  if(started&&song.ended)finish();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- the song drives everything ---------- */
+const song=new Audio('song.mp3');song.preload='auto';
+const TEST=+new URLSearchParams(location.search).get('t')||0;
+let started=false;
+const clock=()=>started?song.currentTime:TEST;
+const startEl=document.getElementById('start');
+function start(){if(started)return;started=true;startEl.classList.add('gone');
+  song.currentTime=TEST;song.play().catch(()=>{started=false;startEl.classList.remove('gone');});}
+function finish(){started=false;startEl.classList.remove('gone');song.currentTime=0;}
+startEl.addEventListener('click',start);
+addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();if(!started)start();else if(song.paused)song.play();else song.pause();}});
+addEventListener('resize',layout);
+layout();show(womanAt(TEST));
+requestAnimationFrame(frame);
+})();
+</script>
