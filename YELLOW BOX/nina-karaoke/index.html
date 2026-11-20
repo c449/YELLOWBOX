@@ -13,21 +13,15 @@ body{background:#000;margin:0;overflow:hidden;font-family:Georgia,'Times New Rom
 .layer img{position:absolute;opacity:0;will-change:opacity,transform;
   transition:opacity 1.8s ease,transform 0s linear 1.8s;transform:scale(1)}
 .layer img.on{opacity:1;transition:opacity 1.8s ease,transform 16s linear;transform:scale(1.1)}
-#trip{display:flex}
-#trip .col{position:relative;flex:1;overflow:hidden;opacity:0;transition:opacity .45s ease}
-#trip .col.on{opacity:1}
-#trip img{opacity:1;transition:transform 6s linear;transform:scale(1)}
-#trip .col.on img{transform:scale(1.08)}
 #shade{position:fixed;inset:0;pointer-events:none;
   background:linear-gradient(to bottom,transparent 45%,rgba(0,0,0,.8) 100%)}
 #lyrics{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
 #start{position:fixed;inset:0;cursor:pointer}
 #start.gone{display:none}
-@media (prefers-reduced-motion:reduce){.layer img.on,#trip .col.on img{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.layer img.on{transform:scale(1)}}
 </style>
 
 <div id="main" class="layer" aria-hidden="true"></div>
-<div id="trip" class="layer off" aria-hidden="true"><div class="col"></div><div class="col"></div><div class="col"></div></div>
 <div id="shade"></div>
 <canvas id="lyrics" aria-label="Lyrics of Bellies by Nina Nastasia in Cecilia's calligraphy, karaoke style"></canvas>
 <div id="start" role="button" tabindex="0" aria-label="Start the song"></div>
@@ -68,11 +62,8 @@ function place(img,a,bw,bh,zoom){
 }
 const main=document.getElementById('main'),IMG={};
 Object.entries(ART).forEach(([k,a])=>{const im=new Image();im.alt='';im.decoding='async';im.src=src(a);main.appendChild(im);IMG[k]=im;});
-const trip=document.getElementById('trip'),cols=[...trip.children];
-const timgs=cols.map(c=>{const im=new Image();im.alt='';c.appendChild(im);return im;});
 function layout(){
   Object.entries(ART).forEach(([k,a])=>place(IMG[k],a,innerWidth,innerHeight,a.z));
-  if(tripSet)tripSet.forEach((k,i)=>place(timgs[i],ART[k],cols[i].clientWidth,cols[i].clientHeight,ART[k].z*.85));
 }
 
 /* ---------- lyrics: Cecilia's calligraphy sheet, one line at a time ---------- */
@@ -109,7 +100,7 @@ let LINES=null,INK=null;
       let ok=lab[sp]>0&&K[lab[sp]]===1;
       if(!ok&&!lab[sp]){for(let dy=-1;dy<=1&&!ok;dy++)for(let dx=-1;dx<=1;dx++){const q=sp+dy*W+dx;if(q>=0&&q<W*H&&lab[q]&&K[lab[q]]){ok=true;break;}}}
       const v=255-(D[di]*.3+D[di+1]*.59+D[di+2]*.11);D[di]=D[di+1]=D[di+2]=0;D[di+3]=ok?Math.max(0,Math.min(255,(v-12)*1.3)):0;}}
-    ox.putImageData(od,0,0);return{c:o,w:bw,h:bh,by};};
+    ox.putImageData(od,0,0);return{c:o,w:bw,h:bh,bx,by};};
   // each word is cut from its own strokes, so slanted letters stay whole
   const L0=box.map((b,j)=>{const L=cut(keep[j],b),cuts=[-1e9,...(WORDS[j]||[]),1e9];
     L.words=cuts.slice(1).map((e,i)=>{const K=new Uint8Array(comps.length),wb={x0:W,x1:0,y0:H,y1:0};
@@ -123,63 +114,72 @@ let LINES=null,INK=null;
   };hi.src='lyrics-4x.jpg';
 };im.src='lyrics.jpg';}
 
-// [sheet line, start, end] in seconds of the song, from where each line is sung
-const CUES=[[0,11.1,15.2],[1,15.4,20.5],[2,20.7,24.9],[3,25.1,30.3],[4,32.3,35.9],[5,36.1,41.6],[6,42.3,46.1],[7,46.2,51.8],
-  [21,56.6,58.9],[10,59.1,61.1],[11,61.2,64.2],[12,64.4,68.1],[13,68.3,73.0],
-  [14,99.3,103.7],[15,103.9,110.2],[16,110.4,113.2],[17,113.4,118.2],
-  [21,147.6,149.5],[10,149.7,152.1],[11,152.3,155.1],[12,155.3,158.3],[13,158.5,164.6]];
-// "you wish, you wish, you wish": each lands on top of the last, very big, a woman appearing for each
-const STACKS=[{at:[52.6,54.5,55.7],end:56.6,w:['bar','fan','absinthe']},{at:[143.6,145.4,146.6],end:147.6,w:['violets','railway','nana']}];
-const COUNT_IN=[11.1,99.3,143.6];   // verses that start after a long rest: their first line waits on screen a little longer
+// [written piece, when each word is sung, when the line leaves] in seconds of the song (timed from the recording, word by word)
+const CUES=[
+  [0,[10.16,11.58,12.58],15.08],
+  [1,[15.36,15.84,16.40,16.84,18.10],20.60],
+  [2,[20.70,20.98,21.36,22.16,23.33],24.58],
+  [3,[24.58,25.64,27.30,29.50],32.00],
+  [4,[32.30,33.48],34.88],
+  [5,[34.88,36.98,37.37,38.90],41.40],
+  [6,[41.75,42.40,42.66,43.60,45.80],46.33],
+  [7,[46.33,46.60,48.00,49.85,50.80],52.44],
+  [21,[56.80,57.47],58.10],
+  [10,[58.10,59.22,60.32],60.70],
+  [11,[60.70,62.00,62.89],63.70],
+  [12,[63.70,64.65,66.07],67.46],
+  [13,[67.46,68.73,69.64,70.62,71.55,72.36],74.86],
+  [14,[98.40,99.80,100.60],103.10],
+  [15,[103.30,104.20,105.11,106.48,107.94],110.00],
+  [16,[110.00,110.90,111.90,112.27],113.30],
+  [17,[113.30,113.50,113.93,114.35,114.83,115.75],118.25],
+  [21,[147.72,148.40],148.95],
+  [10,[148.95,150.12,151.06],151.40],
+  [11,[151.40,152.94,153.85],154.20],
+  [12,[154.20,155.55,156.95],158.60],
+  [13,[158.60,159.90,160.69,161.66,162.50,163.34],165.84]];
+// "you wish, you wish, you wish": one woman, the three written one under the other, each word as it is sung
+const STACKS=[{rows:[[52.44,53.72],[54.26,54.90],[55.34,56.22]],end:56.80,w:'bar'},{rows:[[143.18,144.54],[145.07,145.79],[146.32,147.13]],end:147.72,w:'violets'}];
 
 /* ---------- who calls when: a new woman for every line; slow changes in the instrumental parts; the barmaid at the close ---------- */
 const ORDER=['violets','railway','loge','absinthe','plum','repos','lady','nana','cradle','balcony','swing','fan','parasol'];
 let EV=[[0,'bar']];{let n=0;
-  CUES.forEach((c,i)=>{EV.push([c[1]-.6,ORDER[n++%ORDER.length]]);
-    const end=CUES[i+1]?CUES[i+1][1]:DURATION;
-    for(let s=c[2]+1.5;end-s>9;s+=8)if(!STACKS.some(z=>s>=z.at[0]-1&&s<z.end))EV.push([s,ORDER[n++%ORDER.length]]);});
+  CUES.forEach((c,i)=>{EV.push([c[1][0]-.6,ORDER[n++%ORDER.length]]);
+    const end=CUES[i+1]?CUES[i+1][1][0]:DURATION;
+    for(let s=c[2]+1.5;end-s>9;s+=8)if(!STACKS.some(z=>s>=z.rows[0][0]-1&&s<z.end))EV.push([s,ORDER[n++%ORDER.length]]);});
   EV=EV.filter(e=>e[0]<212);EV.push([212,'bar']);}
 const womanAt=t=>{let k=EV[0][1];for(const e of EV){if(e[0]<=t)k=e[1];else break;}return k;};
 
 /* ---------- drawing ---------- */
-let shown=null,tripSet=null,tripOn=-1;
+let shown=null;
 function show(k){if(k===shown)return;if(shown)IMG[shown].classList.remove('on');IMG[k].classList.add('on');shown=k;}
 
-function drawLine(L,cx,cy,sc,alpha,p){
-  const w=L.w*sc,h=L.h*sc,x=cx-w/2,y=cy-h/2;
-  lx.globalAlpha=alpha;
-  // one word at a time, alone: the word being sung, centred where the line sits
-  if(p<=0)return;const n=L.words.length,d=L.words[Math.min(n-1,Math.floor(p*n))];
-  const dw=d.w*sc,dh=d.h*sc,dx=cx-dw/2,dy=y+(d.by-L.by)*sc;
-  lx.save();lx.shadowColor='#000';lx.shadowBlur=16;lx.drawImage(d.lit,dx,dy,dw,dh);
-  lx.shadowBlur=0;lx.drawImage(d.lit,dx,dy,dw,dh);lx.restore();
+function drawWord(d,x,y,sc){
+  const dw=d.w*sc,dh=d.h*sc;
+  lx.save();lx.shadowColor='#000';lx.shadowBlur=16;lx.drawImage(d.lit,x,y,dw,dh);
+  lx.shadowBlur=0;lx.drawImage(d.lit,x,y,dw,dh);lx.restore();
 }
+const lastAt=(ts,t)=>{let k=-1;ts.forEach((v,i)=>{if(v<=t)k=i;});return k;};
 function frame(){
-  const t=clock(),w=innerWidth,h=innerHeight,dpr=Math.min(devicePixelRatio,2);
+  const t=clock()+.08,w=innerWidth,h=innerHeight,dpr=Math.min(devicePixelRatio,2);
   if(LY.width!==Math.round(w*dpr)||LY.height!==Math.round(h*dpr)){LY.width=Math.round(w*dpr);LY.height=Math.round(h*dpr);}
   lx.setTransform(1,0,0,1,0,0);lx.clearRect(0,0,LY.width,LY.height);lx.setTransform(dpr,0,0,dpr,0,0);lx.imageSmoothingQuality='high';
   const g=Math.max(16,w*.05);
-  // the stacks: three women side by side, three "you wish" piled up very big
-  const S=STACKS.find(z=>t>=z.at[0]-.1&&t<z.end);
-  if(S){if(tripSet!==S.w){tripSet=S.w;S.w.forEach((k,i)=>{timgs[i].src=src(ART[k]);});layout();}
-    trip.classList.remove('off');main.classList.add('off');
-    const n=S.at.filter(a=>t>=a).length;if(n!==tripOn){cols.forEach((c,i)=>c.classList.toggle('on',i<n));tripOn=n;}
-    if(LINES)S.at.forEach((t0,k)=>{if(t<t0)return;const L=LINES[18+k],a=1,
-      sc=Math.min((w-2*g)/L.w,h*.6/L.h),p=Math.min(1,(t-t0)/Math.max(.4,((S.at[k+1]||S.end)-t0)*.8));
-      drawLine(L,w/2,h*.55,sc,Math.max(0,a),p);});
+  const S=STACKS.find(z=>t>=z.rows[0][0]-.1&&t<z.end);
+  if(S){
+    show(S.w);
+    // three rows, aligned left, one under the other
+    if(LINES){const R=[18,19,20].map(i=>LINES[i]),mw=Math.max(...R.map(L=>L.w)),mh=Math.max(...R.map(L=>L.h)),
+      sc=Math.min((w-2*g)/mw,h*.26/mh),top=(h-3*mh*sc)/2;
+      S.rows.forEach((ts,r)=>{const L=R[r],k=lastAt(ts,t);
+        for(let i=0;i<=k;i++){const d=L.words[i];drawWord(d,g+(d.bx-L.bx)*sc,top+r*mh*sc+(d.by-L.by)*sc,sc);}});}
   }else{
-    if(tripOn!==-1){trip.classList.add('off');main.classList.remove('off');cols.forEach(c=>c.classList.remove('on'));tripOn=-1;}
     show(womanAt(t));
-    if(LINES){
-      // the current line, one word at a time
-      for(let i=0;i<CUES.length;i++){const c=CUES[i],prevEnd=i?CUES[i-1][2]:0,
-          lead=COUNT_IN.includes(c[1])?3:Math.min(1.2,Math.max(.2,c[1]-prevEnd));
-        if(t<c[1]-lead||t>=c[2]+.2)continue;
-        const L=LINES[c[0]],a=1,p=Math.min(1,Math.max(0,(t-c[1])/Math.max(.5,c[2]-c[1]-.25)));
-        const sc=Math.min(3*(w-2*g)/INK.w,(w-2*g)/L.w,h*.2/L.h),cy=h*.72;
-        drawLine(L,w/2,cy,sc,a,p);
-        break;}
-    }
+    // the line being sung: only the word being sung, centred
+    if(LINES)for(const c of CUES){const ts=c[1];if(t<ts[0]||t>=c[2])continue;
+      const L=LINES[c[0]],k=lastAt(ts,t),d=L.words[Math.min(k,L.words.length-1)];
+      const sc=Math.min(3*(w-2*g)/INK.w,(w-2*g)/L.w,h*.2/L.h),cy=h*.72;
+      drawWord(d,(w-d.w*sc)/2,cy-L.h*sc/2+(d.by-L.by)*sc,sc);break;}
   }
   lx.globalAlpha=1;
   if(started&&song.ended)finish();
