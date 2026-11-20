@@ -78,7 +78,10 @@ function layout(){
 /* ---------- lyrics: Cecilia's calligraphy sheet, one line at a time ---------- */
 // approximate vertical centre of each written line on the sheet (original pixels)
 const LINE_Y=[128,230,363,470,670,782,883,1019,1240,1390,1524,1659,1824,1950,2090,2194,2297,2415];
-const GAP=.18;   // word gap, as a share of the line's height
+// where one word ends and the next begins on each written piece (x on the sheet, between the words)
+const WORDS=[[300,400],[265,420,500,600],[270,375,495,560],[260,320,560],[330],[235,350,520],[260,400,560,675],[250,410,570,715],
+  [],[],[300,440],[615,740],[310,500],[260,420,610,725,840],[290,440],[320,420,540,690],[460,610,800],[240,360,450,540,670],
+  [290],[550],[260],[435]];
 const LY=document.getElementById('lyrics'),lx=LY.getContext('2d');
 let LINES=null,INK=null;
 // each stroke of ink is traced as a whole and given to the written line it sits on, so loops and tails stay with their letters
@@ -99,23 +102,23 @@ let LINES=null,INK=null;
   const keep=pieces.map(pc=>{const set=new Uint8Array(comps.length);comps.forEach((k,id)=>{if(k&&k.line===pc.line&&pc.pick(k))set[id]=1;});return set;});
   const box=pieces.map((pc,j)=>{const b={x0:W,x1:0,y0:H,y1:0};comps.forEach((k,id)=>{if(keep[j][id]){b.x0=Math.min(b.x0,k.x0);b.x1=Math.max(b.x1,k.x1);b.y0=Math.min(b.y0,k.y0);b.y1=Math.max(b.y1,k.y1);}});return b;});
   const hi=new Image();hi.onload=()=>{const S=hi.naturalWidth/W;
-  const L0=box.map((b,j)=>{const K=keep[j],pad=3,bx=Math.max(0,b.x0-pad),by=Math.max(0,b.y0-pad),bw=Math.min(W,b.x1+pad+1)-bx,bh=Math.min(H,b.y1+pad+1)-by;
+  const cut=(K,b)=>{const pad=3,bx=Math.max(0,b.x0-pad),by=Math.max(0,b.y0-pad),bw=Math.min(W,b.x1+pad+1)-bx,bh=Math.min(H,b.y1+pad+1)-by;
     const cw=Math.round(bw*S),ch=Math.round(bh*S),o=document.createElement('canvas');o.width=cw;o.height=ch;const ox=o.getContext('2d');
     ox.drawImage(hi,bx*S,by*S,bw*S,bh*S,0,0,cw,ch);const od=ox.getImageData(0,0,cw,ch),D=od.data;
     for(let y=0;y<ch;y++){const sy=by+Math.min(bh-1,Math.floor(y/S));for(let xx=0;xx<cw;xx++){const sx=bx+Math.min(bw-1,Math.floor(xx/S)),sp=sy*W+sx,di=(y*cw+xx)*4;
       let ok=lab[sp]>0&&K[lab[sp]]===1;
       if(!ok&&!lab[sp]){for(let dy=-1;dy<=1&&!ok;dy++)for(let dx=-1;dx<=1;dx++){const q=sp+dy*W+dx;if(q>=0&&q<W*H&&lab[q]&&K[lab[q]]){ok=true;break;}}}
       const v=255-(D[di]*.3+D[di+1]*.59+D[di+2]*.11);D[di]=D[di+1]=D[di+2]=0;D[di+3]=ok?Math.max(0,Math.min(255,(v-12)*1.3)):0;}}
-    ox.putImageData(od,0,0);return{c:o,w:bw,h:bh};});
-  // white ink, word by word
+    ox.putImageData(od,0,0);return{c:o,w:bw,h:bh,by};};
+  // each word is cut from its own strokes, so slanted letters stay whole
+  const L0=box.map((b,j)=>{const L=cut(keep[j],b),cuts=[-1e9,...(WORDS[j]||[]),1e9];
+    L.words=cuts.slice(1).map((e,i)=>{const K=new Uint8Array(comps.length),wb={x0:W,x1:0,y0:H,y1:0};
+      comps.forEach((k,id)=>{if(keep[j][id]&&k.cx>=cuts[i]&&k.cx<e){K[id]=1;wb.x0=Math.min(wb.x0,k.x0);wb.x1=Math.max(wb.x1,k.x1);wb.y0=Math.min(wb.y0,k.y0);wb.y1=Math.max(wb.y1,k.y1);}});
+      return wb.x1>=wb.x0?cut(K,wb):null;}).filter(Boolean);
+    return L;});
+  // white ink
   const tint=(c,col)=>{const o=document.createElement('canvas');o.width=c.width;o.height=c.height;const g=o.getContext('2d');g.drawImage(c,0,0);g.globalCompositeOperation='source-in';g.fillStyle=col;g.fillRect(0,0,o.width,o.height);return o;};
-  L0.forEach(L=>{L.lit=tint(L.c,'#fff');
-    // where each word ends: a gap in the ink wider than a fraction of the line height
-    const c=L.c,cw=c.width,ch=c.height,A=c.getContext('2d').getImageData(0,0,cw,ch).data,col=new Uint8Array(cw);
-    for(let xx=0;xx<cw;xx++)for(let y=0;y<ch;y++)if(A[(y*cw+xx)*4+3]>40){col[xx]=1;break;}
-    const gap=ch*GAP,ends=[];let run=0,last=-1;
-    for(let xx=0;xx<cw;xx++){if(col[xx]){if(last>=0&&run>=gap)ends.push((last+1+run/2)/cw);run=0;last=xx;}else run++;}
-    ends.push(1);L.ends=ends;});
+  L0.forEach(L=>L.words.forEach(d=>{d.lit=tint(d.c,'#fff');}));
   INK={w:Math.max(...box.slice(0,LINE_Y.length).map(b=>b.x1-b.x0))};LINES=L0;
   };hi.src='lyrics-4x.jpg';
 };im.src='lyrics.jpg';}
@@ -145,11 +148,11 @@ function show(k){if(k===shown)return;if(shown)IMG[shown].classList.remove('on');
 function drawLine(L,cx,cy,sc,alpha,p){
   const w=L.w*sc,h=L.h*sc,x=cx-w/2,y=cy-h/2;
   lx.globalAlpha=alpha;
-  // one word at a time, each whole: words shown grow with how far the line is sung
-  if(p<=0)return;const n=L.ends.length,k=Math.min(n,Math.floor(p*n)+1),r=L.ends[k-1];
-  lx.save();lx.beginPath();lx.rect(x-20,y-20,w*r+20,h+40);lx.clip();
-  lx.shadowColor='#000';lx.shadowBlur=16;lx.drawImage(L.lit,x,y,w,h);
-  lx.shadowBlur=0;lx.drawImage(L.lit,x,y,w,h);lx.restore();
+  // one word at a time, alone: the word being sung, centred where the line sits
+  if(p<=0)return;const n=L.words.length,d=L.words[Math.min(n-1,Math.floor(p*n))];
+  const dw=d.w*sc,dh=d.h*sc,dx=cx-dw/2,dy=y+(d.by-L.by)*sc;
+  lx.save();lx.shadowColor='#000';lx.shadowBlur=16;lx.drawImage(d.lit,dx,dy,dw,dh);
+  lx.shadowBlur=0;lx.drawImage(d.lit,dx,dy,dw,dh);lx.restore();
 }
 function frame(){
   const t=clock(),w=innerWidth,h=innerHeight,dpr=Math.min(devicePixelRatio,2);
