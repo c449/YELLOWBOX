@@ -175,11 +175,12 @@ function frame(){
         for(let i=0;i<=k;i++){const d=L.words[i];drawWord(d,g+(d.bx-L.bx)*sc,top+r*mh*sc+(d.by-L.by)*sc,sc);}});}
   }else{
     show(womanAt(t));
-    // the line being sung: only the word being sung, centred
+    // the line being sung: the sentence builds, each word joining as it is sung
     if(LINES)for(const c of CUES){const ts=c[1];if(t<ts[0]||t>=c[2])continue;
-      const L=LINES[c[0]],k=lastAt(ts,t),d=L.words[Math.min(k,L.words.length-1)];
-      const sc=Math.min(3*(w-2*g)/INK.w,(w-2*g)/L.w,h*.2/L.h),cy=h*.72;
-      drawWord(d,(w-d.w*sc)/2,cy-L.h*sc/2+(d.by-L.by)*sc,sc);break;}
+      const L=LINES[c[0]],k=Math.min(lastAt(ts,t),L.words.length-1);
+      const sc=Math.min(3*(w-2*g)/INK.w,(w-2*g)/L.w,h*.2/L.h),x0=(w-L.w*sc)/2,y0=h*.72-L.h*sc/2;
+      for(let i=0;i<=k;i++){const d=L.words[i];drawWord(d,x0+(d.bx-L.bx)*sc,y0+(d.by-L.by)*sc,sc);}
+      break;}
   }
   lx.globalAlpha=1;
   if(started&&song.ended)finish();
