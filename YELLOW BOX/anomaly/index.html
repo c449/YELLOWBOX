@@ -28,7 +28,7 @@
 </head>
 <body>
 <div id="stage">
-  <img id="photo" src="anomaly.jpg" alt="">
+  <img id="photo" src="anomaly.png" alt="">
   <canvas id="c"></canvas>
 </div>
 <h1>THE ANOMALY</h1>
@@ -56,7 +56,7 @@ function layout() {
 // find the white inside of the anomaly in the photo
 function buildMask() {
   PW = photo.naturalWidth; PH = photo.naturalHeight;
-  const k = Math.min(1, 2400 / PW);
+  const k = 2400 / PW;
   MW = Math.round(PW * k); MH = Math.round(PH * k);
   cv.width = MW; cv.height = MH;
   const t = document.createElement('canvas'); t.width = MW; t.height = MH;
@@ -143,7 +143,7 @@ document.getElementById('save').onclick = () => {
     return o;
   };
   const give = b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'the-anomaly.jpg'; a.click(); };
-  out(PW, PH).toBlob(b => b ? give(b) : out(MW, MH).toBlob(give, 'image/jpeg', 0.95), 'image/jpeg', 0.95);
+  out(MW, MH).toBlob(give, "image/jpeg", 0.95);
 };
 addEventListener('dragover', e => e.preventDefault());
 addEventListener('drop', e => { e.preventDefault(); load(e.dataTransfer.files[0]); });
