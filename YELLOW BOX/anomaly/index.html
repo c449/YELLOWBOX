@@ -9,7 +9,6 @@
 <meta property="og:title" content="THE ANOMALY">
 <link rel="icon" href="/favicon.png">
 <style>
-  @font-face { font-family: "Cecilia"; src: url("cecilia-Regular.otf") format("opentype"); font-display: block; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: #000; color: #fff; overflow: hidden; }
   body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; text-transform: uppercase; }
@@ -18,12 +17,11 @@
   #stage canvas { touch-action: none; }
   canvas.grab { cursor: grab; }
   canvas.grabbing { cursor: grabbing; }
-  h1 { position: fixed; top: 24px; left: 24px; font-family: "Cecilia", serif; font-weight: 400; text-transform: none; font-size: clamp(32px, 6vw, 72px); line-height: 1; pointer-events: none; }
   nav { position: fixed; left: 24px; bottom: 24px; display: flex; gap: 24px; }
   button { background: none; border: 0; color: #fff; font: inherit; font-size: 15px; letter-spacing: 0.04em; cursor: pointer; padding: 0; }
   button:disabled { opacity: 0; pointer-events: none; }
   input { display: none; }
-  @media (max-width: 600px) { h1 { top: 16px; left: 16px; } nav { left: 16px; bottom: 16px; } }
+  @media (max-width: 600px) { nav { left: 16px; bottom: 16px; } }
 </style>
 </head>
 <body>
@@ -31,7 +29,6 @@
   <img id="photo" src="anomaly.png" alt="">
   <canvas id="c"></canvas>
 </div>
-<h1>THE ANOMALY</h1>
 <nav>
   <button id="add" disabled>ADD IMAGE</button>
   <button id="save" disabled>SAVE</button>
