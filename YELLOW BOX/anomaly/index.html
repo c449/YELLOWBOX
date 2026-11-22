@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>THE ANOMALY</title>
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://deusaderit.com/anomaly/">
+<meta property="og:title" content="THE ANOMALY">
+<link rel="icon" href="/favicon.png">
+<style>
+  @font-face { font-family: "Cecilia"; src: url("cecilia-Regular.otf") format("opentype"); font-display: block; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; color: #fff; overflow: hidden; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; text-transform: uppercase; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  canvas.grab { cursor: grab; }
+  canvas.grabbing { cursor: grabbing; }
+  h1 { position: fixed; top: 24px; left: 24px; font-family: "Cecilia", serif; font-weight: 400; text-transform: none; font-size: clamp(32px, 6vw, 72px); line-height: 1; pointer-events: none; }
+  nav { position: fixed; left: 24px; bottom: 24px; display: flex; gap: 24px; }
+  button { background: none; border: 0; color: #fff; font: inherit; font-size: 15px; letter-spacing: 0.04em; cursor: pointer; padding: 0; }
+  button:disabled { opacity: 0; pointer-events: none; }
+  input { display: none; }
+  @media (max-width: 600px) { h1 { top: 16px; left: 16px; } nav { left: 16px; bottom: 16px; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<h1>THE ANOMALY</h1>
+<nav>
+  <button id="add">ADD IMAGE</button>
+  <button id="save" disabled>SAVE</button>
+</nav>
+<input id="file" type="file" accept="image/*">
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W, H, DPR, scene, rift, img = null;
+let view = { s: 1, x: 0, y: 0 };
+
+// seeded random so the anomaly keeps its shape
+function rng(seed) { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
+
+function build() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  const R = rng(1999);
+  const m = Math.min(W, H), portrait = H > W;
+
+  // axis of the tear
+  const ax = -0.04 * W, ay = (portrait ? 0.62 : 0.6) * H;
+  const bx = 1.04 * W, by = (portrait ? 0.4 : 0.36) * H;
+  const len = Math.hypot(bx - ax, by - ay);
+  const ux = (bx - ax) / len, uy = (by - ay) / len;
+  const nx = uy, ny = -ux; // normal pointing up
+  const base = m * (portrait ? 0.14 : 0.12);
+
+  const g = (t, c, w) => Math.exp(-((t - c) * (t - c)) / (2 * w * w));
+  const env = t => Math.min(1, (1 - t) / 0.12) * (0.55 + 0.45 * Math.sin(Math.PI * Math.min(t * 1.6, 1)));
+  const N = 260;
+  const ph = [R() * 6, R() * 6, R() * 6, R() * 6];
+  const wob = (t, o) => 0.07 * Math.sin(t * 41 + ph[o]) + 0.045 * Math.sin(t * 89 + ph[o + 1]) + 0.03 * Math.sin(t * 157 + ph[o]);
+  const top = [], bot = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const e = env(t);
+    let ht = e * (0.9 + 0.12 * Math.sin(t * 19) - 0.55 * g(t, 0.28, 0.025) - 0.75 * g(t, 0.62, 0.018) + 0.15 * g(t, 0.45, 0.08) + wob(t, 0));
+    let hb = e * (1.0 + 0.1 * Math.sin(t * 23 + 1) + 0.35 * g(t, 0.17, 0.06) - 0.25 * g(t, 0.48, 0.05) - 0.3 * g(t, 0.72, 0.06) + wob(t, 2));
+    ht = Math.max(0.02, ht) * base + (R() - 0.5) * 2.2;
+    hb = Math.max(0.02, hb) * base + (R() - 0.5) * 2.2;
+    const px = ax + ux * len * t, py = ay + uy * len * t;
+    top.push([px + nx * ht, py + ny * ht]);
+    bot.push([px - nx * hb, py - ny * hb]);
+  }
+  const path = new Path2D();
+  path.moveTo(top[0][0], top[0][1]);
+  top.forEach(p => path.lineTo(p[0], p[1]));
+  for (let i = bot.length - 1; i >= 0; i--) path.lineTo(bot[i][0], bot[i][1]);
+  path.closePath();
+  let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+  top.concat(bot).forEach(([x, y]) => { minx = Math.min(minx, x); maxx = Math.max(maxx, x); miny = Math.min(miny, y); maxy = Math.max(maxy, y); });
+  rift = { path, box: { x: Math.max(0, minx), y: miny, w: Math.min(W, maxx) - Math.max(0, minx), h: maxy - miny } };
+
+  // lightning branches
+  const levels = [new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+  const step = Math.max(2.5, m / 260);
+  function bolt(x, y, a, L, d) {
+    const p = levels[Math.min(3, 3 - d)];
+    p.moveTo(x, y);
+    const a0 = a; let walked = 0;
+    while (walked < L) {
+      a += (R() - 0.5) * 0.8 + (a0 - a) * 0.1;
+      x += Math.cos(a) * step; y += Math.sin(a) * step;
+      walked += step;
+      p.lineTo(x, y);
+      if (R() < 0.08) {
+        const sd = R() < 0.5 ? -1 : 1, q = levels[3];
+        let tx = x, ty = y, ta = a + sd * (0.6 + R() * 0.9);
+        q.moveTo(tx, ty);
+        for (let j = 0, n = 2 + R() * 4; j < n; j++) { ta += (R() - 0.5) * 1.2; tx += Math.cos(ta) * step; ty += Math.sin(ta) * step; q.lineTo(tx, ty); }
+        p.moveTo(x, y);
+      }
+      if (d > 0 && R() < 0.05) {
+        const side = R() < 0.5 ? -1 : 1;
+        bolt(x, y, a + side * (0.5 + R() * 0.8), (L - walked) * (0.35 + R() * 0.35) + step * 3, d - 1);
+        p.moveTo(x, y);
+      }
+    }
+  }
+  const outUp = Math.atan2(ny, nx), outDown = Math.atan2(-ny, -nx);
+  const big = Math.max(m * 0.36, Math.max(W, H) * 0.24);
+  const mains = [[0.08, 1, 0.8], [0.2, 1, 1], [0.34, 1, 0.9], [0.5, 1, 1.1], [0.66, 1, 1.1], [0.8, 1, 0.7], [0.93, 1, 0.6],
+                 [0.06, -1, 0.9], [0.18, -1, 0.8], [0.3, -1, 0.7], [0.44, -1, 1.2], [0.58, -1, 0.9], [0.74, -1, 0.9], [0.88, -1, 0.5]];
+  mains.forEach(([t, side, k]) => {
+    const i = Math.round(t * N), p = side > 0 ? top[i] : bot[i];
+    const a = (side > 0 ? outUp : outDown) + (R() < 0.5 ? -1 : 1) * (0.25 + R() * 0.45);
+    bolt(p[0], p[1], a, big * k * (0.7 + R() * 0.5), 3);
+  });
+  for (let i = 2; i < N - 4; i += 3) {
+    [[top[i], outUp], [bot[i], outDown]].forEach(([p, o]) => {
+      if (R() < 0.22) bolt(p[0], p[1], o + (R() - 0.5) * 1.6, m * (0.015 + R() * 0.07), R() < 0.4 ? 1 : 0);
+    });
+  }
+
+  // static layer: stars, branches, halo
+  scene = document.createElement('canvas');
+  scene.width = cv.width; scene.height = cv.height;
+  const s = scene.getContext('2d');
+  s.scale(DPR, DPR);
+  s.fillStyle = '#02010a'; s.fillRect(0, 0, W, H);
+  const stars = Math.round(W * H / 1400);
+  for (let i = 0; i < stars; i++) {
+    const r = R() < 0.92 ? 0.6 + R() * 0.7 : 1.3 + R() * 0.9;
+    s.globalAlpha = 0.5 + R() * 0.5;
+    s.fillStyle = '#fff';
+    s.beginPath(); s.arc(R() * W, R() * H, r, 0, 7); s.fill();
+  }
+  s.globalAlpha = 1;
+  s.lineCap = 'round'; s.lineJoin = 'round';
+  const widths = [3.2, 2.4, 1.7, 1.2].map(w => w * Math.max(1, m / 900));
+  levels.forEach((p, i) => {
+    s.shadowColor = '#5b1cff'; s.shadowBlur = 14;
+    s.strokeStyle = 'rgba(120,50,255,0.55)'; s.lineWidth = widths[i] * 3; s.stroke(p);
+    s.shadowBlur = 6;
+    s.strokeStyle = '#9a5cff'; s.lineWidth = widths[i] * 1.4; s.stroke(p);
+    s.shadowBlur = 0;
+    s.strokeStyle = '#e2c9ff'; s.lineWidth = widths[i] * 0.5; s.stroke(p);
+  });
+  // blue halo around the tear
+  const hw = Math.max(1, m / 900);
+  s.shadowColor = '#1d2bff'; s.shadowBlur = 60 * hw;
+  s.strokeStyle = 'rgba(40,40,255,0.45)'; s.lineWidth = 50 * hw; s.stroke(path);
+  s.shadowBlur = 30 * hw;
+  s.strokeStyle = 'rgba(40,50,255,0.7)'; s.lineWidth = 28 * hw; s.stroke(path);
+  s.shadowColor = '#4a5cff'; s.shadowBlur = 18 * hw;
+  s.strokeStyle = '#3346ff'; s.lineWidth = 16 * hw; s.stroke(path);
+  draw();
+}
+
+function cover() {
+  const b = rift.box;
+  const k = Math.max(b.w / img.width, b.h / img.height) * view.s;
+  return { k, x: b.x + b.w / 2 - img.width * k / 2 + view.x, y: b.y + b.h / 2 - img.height * k / 2 + view.y };
+}
+
+function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(scene, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.save();
+  ctx.clip(rift.path);
+  ctx.fillStyle = '#e6f0ff'; ctx.fillRect(0, 0, W, H);
+  if (img) { const c = cover(); ctx.drawImage(img, c.x, c.y, img.width * c.k, img.height * c.k); }
+  // blue glow bleeding inward from the edge
+  const hw = Math.max(1, Math.min(W, H) / 900);
+  ctx.shadowColor = '#2a3cff'; ctx.shadowBlur = 22 * hw;
+  ctx.strokeStyle = 'rgba(60,80,255,0.85)'; ctx.lineWidth = 10 * hw; ctx.stroke(rift.path);
+  ctx.restore();
+}
+
+function load(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const url = URL.createObjectURL(file);
+  const im = new Image();
+  im.onload = () => { img = im; view = { s: 1, x: 0, y: 0 }; cv.className = 'grab'; document.getElementById('save').disabled = false; draw(); };
+  im.src = url;
+}
+
+const fileIn = document.getElementById('file');
+document.getElementById('add').onclick = () => fileIn.click();
+fileIn.onchange = () => { load(fileIn.files[0]); fileIn.value = ''; };
+document.getElementById('save').onclick = () => {
+  cv.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'the-anomaly.png'; a.click(); }, 'image/png');
+};
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); load(e.dataTransfer.files[0]); });
+addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])][0]; if (f) load(f); });
+
+// move and zoom the image inside the anomaly
+const pts = new Map(); let last = null;
+cv.addEventListener('pointerdown', e => { if (!img) return; cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); cv.className = 'grabbing'; last = null; });
+cv.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) return;
+  const prev = pts.get(e.pointerId);
+  pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pts.size === 1) { view.x += e.clientX - prev[0]; view.y += e.clientY - prev[1]; }
+  else {
+    const [a, b] = [...pts.values()];
+    const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    if (last) view.s = Math.max(0.3, Math.min(8, view.s * d / last));
+    last = d;
+  }
+  draw();
+});
+const up = e => { pts.delete(e.pointerId); last = null; if (img && !pts.size) cv.className = 'grab'; };
+cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+cv.addEventListener('wheel', e => { if (!img) return; e.preventDefault(); view.s = Math.max(0.3, Math.min(8, view.s * Math.exp(-e.deltaY * 0.0015))); draw(); }, { passive: false });
+
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(build, 120); });
+document.fonts.load('72px Cecilia').finally(build);
+</script>
+</body>
+</html>
